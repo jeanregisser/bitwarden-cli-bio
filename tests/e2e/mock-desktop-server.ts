@@ -107,7 +107,7 @@ export class MockDesktopServer {
     this.connections.push(socket);
     let buffer = Buffer.alloc(0);
 
-    socket.on("data", (chunk) => {
+    socket.on("data", (chunk: Buffer) => {
       buffer = Buffer.concat([buffer, chunk]);
 
       while (buffer.length >= 4) {
