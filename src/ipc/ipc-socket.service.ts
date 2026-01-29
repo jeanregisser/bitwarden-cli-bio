@@ -23,6 +23,10 @@ export class IpcSocketService {
    * This mirrors the logic in desktop_native/core/src/ipc/mod.rs
    */
   getSocketPath(): string {
+    if (process.env.BWBIO_IPC_SOCKET_PATH) {
+      return process.env.BWBIO_IPC_SOCKET_PATH;
+    }
+
     const platform = os.platform();
 
     if (platform === "win32") {

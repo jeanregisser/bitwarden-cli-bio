@@ -1,14 +1,17 @@
 import * as net from "net";
-import * as path from "path";
-import * as os from "os";
-import * as fs from "fs";
 import * as crypto from "crypto";
-import * as forge from "node-forge";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 
 /**
- * Mock Desktop IPC server for testing.
+ * Mock Desktop IPC server for E2E testing.
  *
- * Simulates the Bitwarden Desktop app's IPC protocol.
+ * Implements the real Bitwarden Desktop app IPC protocol:
+ * - Length-delimited JSON messages over Unix socket
+ * - RSA-OAEP (SHA-1) key exchange via setupEncryption
+ * - AES-256-CBC + HMAC-SHA256 encrypted communication (64-byte shared secret)
+ * - Handles getBiometricsStatusForUser and unlockWithBiometricsForUser
  */
 export class MockDesktopServer {
   private server: net.Server | null = null;
@@ -16,9 +19,9 @@ export class MockDesktopServer {
   private connections: net.Socket[] = [];
 
   // Configurable responses
-  private _biometricsEnabled = true;
+  private _biometricsStatus = 0; // BiometricsStatus.Available
   private _userId = "test-user-id";
-  private _userKey = "test-session-key-base64";
+  private _userKey = "test-user-key-base64";
 
   // Message tracking
   private _receivedMessages: Array<{ command: string; payload?: unknown }> = [];
@@ -26,65 +29,37 @@ export class MockDesktopServer {
   // Encryption state per connection
   private connectionStates = new Map<
     net.Socket,
-    { sharedKey: Buffer; messageId: number }
+    { sharedSecret: Buffer }
   >();
 
-  constructor() {
-    this.socketPath = this.getSocketPath();
+  constructor(socketPath?: string) {
+    this.socketPath = socketPath ?? this.getDefaultSocketPath();
   }
 
-  private getSocketPath(): string {
-    const platform = process.platform;
-
-    switch (platform) {
-      case "darwin": {
-        // Use a test-specific path to avoid conflicting with real Desktop app
-        const testDir = path.join(os.tmpdir(), "bwbio-test");
-        fs.mkdirSync(testDir, { recursive: true });
-        return path.join(testDir, "app.sock");
-      }
-      case "win32": {
-        return "\\\\.\\pipe\\bitwarden-test";
-      }
-      case "linux": {
-        const testDir = path.join(os.tmpdir(), "bwbio-test");
-        fs.mkdirSync(testDir, { recursive: true });
-        return path.join(testDir, "bitwarden.sock");
-      }
-      default:
-        throw new Error(`Unsupported platform: ${platform}`);
-    }
+  private getDefaultSocketPath(): string {
+    const dir = path.join(os.tmpdir(), "bwbio-e2e-test");
+    fs.mkdirSync(dir, { recursive: true });
+    return path.join(dir, "s.bw");
   }
 
-  /**
-   * Start the mock server.
-   */
   async start(): Promise<void> {
-    // Clean up any existing socket
+    // Clean up any existing socket file
     try {
       fs.unlinkSync(this.socketPath);
     } catch {
-      // Ignore if doesn't exist
+      // Ignore
     }
 
     return new Promise((resolve, reject) => {
       this.server = net.createServer((socket) => {
         this.handleConnection(socket);
       });
-
       this.server.on("error", reject);
-
-      this.server.listen(this.socketPath, () => {
-        resolve();
-      });
+      this.server.listen(this.socketPath, () => resolve());
     });
   }
 
-  /**
-   * Stop the mock server.
-   */
   async stop(): Promise<void> {
-    // Close all connections
     for (const conn of this.connections) {
       conn.destroy();
     }
@@ -99,6 +74,7 @@ export class MockDesktopServer {
           } catch {
             // Ignore
           }
+          this.server = null;
           resolve();
         });
       } else {
@@ -107,69 +83,47 @@ export class MockDesktopServer {
     });
   }
 
-  /**
-   * Configure biometrics enabled status.
-   */
-  setBiometricsEnabled(enabled: boolean): void {
-    this._biometricsEnabled = enabled;
+  setBiometricsStatus(status: number): void {
+    this._biometricsStatus = status;
   }
 
-  /**
-   * Configure the user ID to return.
-   */
   setUserId(userId: string): void {
     this._userId = userId;
   }
 
-  /**
-   * Configure the user key to return on unlock.
-   */
   setUserKey(key: string): void {
     this._userKey = key;
   }
 
-  /**
-   * Get all received messages for inspection.
-   */
   get receivedMessages(): Array<{ command: string; payload?: unknown }> {
     return [...this._receivedMessages];
   }
 
-  /**
-   * Clear received messages.
-   */
   clearReceivedMessages(): void {
     this._receivedMessages = [];
   }
 
-  /**
-   * Get the socket path for clients to connect to.
-   */
-  getSocketPathForClient(): string {
+  getSocketPath(): string {
     return this.socketPath;
   }
 
   private handleConnection(socket: net.Socket): void {
     this.connections.push(socket);
-
     let buffer = Buffer.alloc(0);
 
     socket.on("data", (chunk) => {
       buffer = Buffer.concat([buffer, chunk]);
 
-      // Try to parse complete messages
       while (buffer.length >= 4) {
         const messageLength = buffer.readUInt32LE(0);
-        if (buffer.length < 4 + messageLength) {
-          break; // Wait for more data
-        }
+        if (buffer.length < 4 + messageLength) break;
 
         const messageJson = buffer.subarray(4, 4 + messageLength).toString("utf8");
         buffer = buffer.subarray(4 + messageLength);
 
         try {
-          const message = JSON.parse(messageJson);
-          this.handleMessage(socket, message);
+          const outer = JSON.parse(messageJson);
+          this.handleOuterMessage(socket, outer);
         } catch (err) {
           console.error("Mock server: failed to parse message", err);
         }
@@ -182,166 +136,185 @@ export class MockDesktopServer {
     });
 
     socket.on("error", () => {
-      // Ignore errors on connection
+      // Ignore
     });
   }
 
-  private handleMessage(socket: net.Socket, message: {
-    command: string;
-    appId: string;
-    messageId: number;
-    payload?: unknown;
-  }): void {
-    this._receivedMessages.push({
-      command: message.command,
-      payload: message.payload,
-    });
+  /**
+   * Handle the outer message format: { appId, message }
+   * The `message` field contains either a setupEncryption command or an encrypted message.
+   */
+  private handleOuterMessage(
+    socket: net.Socket,
+    outer: { appId: string; message: Record<string, unknown> }
+  ): void {
+    const msg = outer.message;
+    const appId = outer.appId;
 
-    switch (message.command) {
-      case "bw-handshake":
-        this.handleHandshake(socket, message);
-        break;
-      case "encrypted":
-        this.handleEncrypted(socket, message);
-        break;
-      default:
-        console.error(`Mock server: unknown command ${message.command}`);
+    if (!msg || typeof msg !== "object") return;
+
+    const command = msg.command as string;
+
+    this._receivedMessages.push({ command, payload: msg });
+
+    if (command === "setupEncryption") {
+      this.handleSetupEncryption(socket, appId, msg);
+    } else if ("encryptionType" in msg) {
+      this.handleEncryptedMessage(socket, appId, msg);
     }
   }
 
-  private handleHandshake(socket: net.Socket, message: {
-    command: string;
-    appId: string;
-    messageId: number;
-    payload?: { publicKey?: string };
-  }): void {
-    // Generate a shared key
-    const sharedKey = crypto.randomBytes(32);
+  private handleSetupEncryption(
+    socket: net.Socket,
+    appId: string,
+    msg: Record<string, unknown>
+  ): void {
+    const publicKeyB64 = msg.publicKey as string;
+    if (!publicKeyB64) return;
 
-    // Encrypt shared key with client's public key
-    const publicKeyPem = Buffer.from(
-      message.payload?.publicKey || "",
-      "base64"
-    ).toString("utf8");
-    const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
-
-    const encryptedSharedKey = publicKey.encrypt(
-      sharedKey.toString("binary"),
-      "RSA-OAEP",
-      {
-        md: forge.md.sha256.create(),
-      }
-    );
-
-    // Store connection state
-    this.connectionStates.set(socket, {
-      sharedKey,
-      messageId: message.messageId,
+    // Import client's public key (SPKI/DER format, base64 encoded)
+    const publicKeyDer = Buffer.from(publicKeyB64, "base64");
+    const publicKey = crypto.createPublicKey({
+      key: publicKeyDer,
+      format: "der",
+      type: "spki",
     });
 
-    // Send response
-    const response = {
-      command: "bw-handshake",
-      messageId: message.messageId,
-      appId: message.appId,
-      payload: {
-        status: "success",
-        sharedKey: Buffer.from(encryptedSharedKey, "binary").toString("base64"),
+    // Generate 64-byte shared secret (32 AES + 32 HMAC)
+    const sharedSecret = crypto.randomBytes(64);
+
+    // Encrypt shared secret with client's public key (RSA-OAEP, SHA-1)
+    const encryptedSecret = crypto.publicEncrypt(
+      {
+        key: publicKey,
+        oaepHash: "sha1",
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
       },
+      sharedSecret
+    );
+
+    this.connectionStates.set(socket, { sharedSecret });
+
+    // Send setupEncryption response
+    const response = {
+      command: "setupEncryption",
+      appId,
+      sharedSecret: encryptedSecret.toString("base64"),
     };
 
     this.sendMessage(socket, response);
   }
 
-  private handleEncrypted(socket: net.Socket, message: {
-    command: string;
-    appId: string;
-    messageId: number;
-    payload?: { iv: string; data: string; mac: string };
-  }): void {
+  private handleEncryptedMessage(
+    socket: net.Socket,
+    appId: string,
+    msg: Record<string, unknown>
+  ): void {
     const state = this.connectionStates.get(socket);
-    if (!state || !message.payload) {
+    if (!state) return;
+
+    const iv = Buffer.from(msg.iv as string, "base64");
+    const data = Buffer.from(msg.data as string, "base64");
+    const mac = Buffer.from(msg.mac as string, "base64");
+
+    const encKey = state.sharedSecret.subarray(0, 32);
+    const macKey = state.sharedSecret.subarray(32, 64);
+
+    // Verify HMAC
+    const hmac = crypto.createHmac("sha256", macKey);
+    hmac.update(iv);
+    hmac.update(data);
+    const expectedMac = hmac.digest();
+    if (!crypto.timingSafeEqual(mac, expectedMac)) {
+      console.error("Mock server: HMAC verification failed");
       return;
     }
 
-    // Decrypt the message
-    const iv = Buffer.from(message.payload.iv, "base64");
-    const data = Buffer.from(message.payload.data, "base64");
-
-    const decipher = crypto.createDecipheriv("aes-256-cbc", state.sharedKey, iv);
+    // Decrypt
+    const decipher = crypto.createDecipheriv("aes-256-cbc", encKey, iv);
     const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
-    const innerMessage = JSON.parse(decrypted.toString("utf8")) as {
+    const inner = JSON.parse(decrypted.toString("utf8")) as {
       command: string;
       userId?: string;
+      messageId?: number;
+      timestamp?: number;
     };
 
-    this._receivedMessages.push({
-      command: innerMessage.command,
-      payload: innerMessage,
-    });
+    this._receivedMessages.push({ command: inner.command, payload: inner });
 
-    // Handle inner command
-    let responsePayload: object;
+    // Build response
+    let responsePayload: Record<string, unknown>;
 
-    switch (innerMessage.command) {
-      case "bw-status":
+    switch (inner.command) {
+      case "getBiometricsStatusForUser":
         responsePayload = {
-          status: "success",
-          biometricsEnabled: this._biometricsEnabled,
-          userId: this._userId,
+          command: "getBiometricsStatusForUser",
+          messageId: inner.messageId,
+          response: this._biometricsStatus,
+          timestamp: Date.now(),
         };
         break;
-      case "bw-credential-retrieval":
-        if (this._biometricsEnabled) {
+      case "unlockWithBiometricsForUser":
+        if (this._biometricsStatus === 0) {
           responsePayload = {
-            status: "success",
+            command: "unlockWithBiometricsForUser",
+            messageId: inner.messageId,
+            response: true,
             userKeyB64: this._userKey,
+            timestamp: Date.now(),
           };
         } else {
           responsePayload = {
-            status: "error",
-            error: "Biometrics not enabled",
+            command: "unlockWithBiometricsForUser",
+            messageId: inner.messageId,
+            response: false,
+            timestamp: Date.now(),
           };
         }
         break;
+      case "getBiometricsStatus":
+        responsePayload = {
+          command: "getBiometricsStatus",
+          messageId: inner.messageId,
+          response: this._biometricsStatus,
+          timestamp: Date.now(),
+        };
+        break;
       default:
         responsePayload = {
-          status: "error",
-          error: `Unknown command: ${innerMessage.command}`,
+          command: inner.command,
+          messageId: inner.messageId,
+          response: null,
+          timestamp: Date.now(),
         };
     }
 
     // Encrypt response
     const responseJson = JSON.stringify(responsePayload);
     const responseIv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(
-      "aes-256-cbc",
-      state.sharedKey,
-      responseIv
-    );
+    const cipher = crypto.createCipheriv("aes-256-cbc", encKey, responseIv);
     const encrypted = Buffer.concat([
       cipher.update(responseJson, "utf8"),
       cipher.final(),
     ]);
 
-    // Create HMAC
-    const hmac = crypto.createHmac("sha256", state.sharedKey);
-    hmac.update(responseIv);
-    hmac.update(encrypted);
-    const mac = hmac.digest();
+    const responseMac = crypto.createHmac("sha256", macKey);
+    responseMac.update(responseIv);
+    responseMac.update(encrypted);
+    const responseTag = responseMac.digest();
 
-    const response = {
-      command: "encrypted",
-      messageId: message.messageId,
-      appId: message.appId,
-      payload: {
+    const outerResponse = {
+      appId,
+      message: {
+        encryptionType: 2,
+        encryptedString: `2.${responseIv.toString("base64")}|${encrypted.toString("base64")}|${responseTag.toString("base64")}`,
         iv: responseIv.toString("base64"),
         data: encrypted.toString("base64"),
-        mac: mac.toString("base64"),
+        mac: responseTag.toString("base64"),
       },
     };
 
-    this.sendMessage(socket, response);
+    this.sendMessage(socket, outerResponse);
   }
 
   private sendMessage(socket: net.Socket, message: object): void {
@@ -349,7 +322,6 @@ export class MockDesktopServer {
     const messageBuffer = Buffer.from(json, "utf8");
     const lengthBuffer = Buffer.alloc(4);
     lengthBuffer.writeUInt32LE(messageBuffer.length, 0);
-
     socket.write(Buffer.concat([lengthBuffer, messageBuffer]));
   }
 }

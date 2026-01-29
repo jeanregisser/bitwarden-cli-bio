@@ -3,4 +3,5 @@ dist/
 *.log
 .DS_Store
 .env
+.env.e2e
 *.tgz
