@@ -29,6 +29,6 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run test:e2e
-    env:
-      BW_TEST_EMAIL: ${{ secrets.BW_TEST_EMAIL }}
-      BW_TEST_PASSWORD: ${{ secrets.BW_TEST_PASSWORD }}
+        env:
+          BW_TEST_EMAIL: ${{ secrets.BW_TEST_EMAIL }}
+          BW_TEST_PASSWORD: ${{ secrets.BW_TEST_PASSWORD }}
