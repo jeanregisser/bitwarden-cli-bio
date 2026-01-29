@@ -68,6 +68,12 @@ describe("bwbio E2E", () => {
   let userKey: string;
 
   beforeAll(async () => {
+    // 0. Configure server if specified (e.g. https://vault.bitwarden.eu)
+    const server = process.env.BW_TEST_SERVER;
+    if (server) {
+      await bw(["config", "server", server]);
+    }
+
     // 1. Login (or verify already logged in)
     const statusResult = await bw(["status"]);
     if (statusResult.exitCode !== 0) {

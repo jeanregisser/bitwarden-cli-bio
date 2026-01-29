@@ -33,3 +33,4 @@ jobs:
         env:
           BW_TEST_EMAIL: ${{ secrets.BW_TEST_EMAIL }}
           BW_TEST_PASSWORD: ${{ secrets.BW_TEST_PASSWORD }}
+          BW_TEST_SERVER: ${{ vars.BW_TEST_SERVER }}
