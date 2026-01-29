@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from "vitest";
-import { execFile } from "child_process";
+import { spawn } from "child_process";
 import * as path from "path";
 import { MockDesktopServer } from "./mock-desktop-server";
 import { extractUserKey, getActiveUserId } from "./extract-user-key";
@@ -19,28 +19,33 @@ function exec(
   command: string,
   args: string[],
   env?: Record<string, string>
-): Promise<{ stdout: string; exitCode: number }> {
+): Promise<{ stdout: string; output: string; exitCode: number }> {
   return new Promise((resolve) => {
-    execFile(
-      command,
-      args,
-      {
-        encoding: "utf-8",
-        env: { ...process.env, ...env },
-        timeout: 30_000,
-      },
-      (error, stdout) => {
-        if (error) {
-          const e = error as { code?: number };
-          resolve({
-            stdout: (stdout ?? "").trim(),
-            exitCode: e.code ?? 1,
-          });
-        } else {
-          resolve({ stdout: (stdout ?? "").trim(), exitCode: 0 });
-        }
+    const child = spawn(command, args, {
+      env: { ...process.env, ...env },
+      timeout: 30_000,
+    });
+
+    const stdoutChunks: Buffer[] = [];
+    const outputChunks: Buffer[] = [];
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdoutChunks.push(chunk);
+      outputChunks.push(chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      outputChunks.push(chunk);
+    });
+
+    child.on("close", (code) => {
+      const stdout = Buffer.concat(stdoutChunks).toString("utf-8").trim();
+      const output = Buffer.concat(outputChunks).toString("utf-8").trim();
+      const exitCode = code ?? 1;
+      if (exitCode !== 0) {
+        console.error(`[${command} ${args.join(" ")}] exit ${exitCode}:\n${output}`);
       }
-    );
+      resolve({ stdout, output, exitCode });
+    });
   });
 }
 
@@ -65,6 +70,9 @@ describe("bwbio E2E", () => {
   beforeAll(async () => {
     // 1. Login (or verify already logged in)
     const statusResult = await bw(["status"]);
+    if (statusResult.exitCode !== 0) {
+      throw new Error(`bw status failed (exit ${statusResult.exitCode})`);
+    }
     const status = JSON.parse(statusResult.stdout);
 
     if (status.status === "unauthenticated") {
@@ -75,7 +83,7 @@ describe("bwbio E2E", () => {
         "--raw",
       ]);
       if (loginResult.exitCode !== 0) {
-        throw new Error(`bw login failed: ${loginResult.stdout}`);
+        throw new Error(`bw login failed (exit ${loginResult.exitCode})`);
       }
     }
 
@@ -85,7 +93,7 @@ describe("bwbio E2E", () => {
     // 3. Unlock to get BW_SESSION
     const unlockResult = await bw(["unlock", BW_TEST_PASSWORD!, "--raw"]);
     if (unlockResult.exitCode !== 0) {
-      throw new Error(`bw unlock failed: ${unlockResult.stdout}`);
+      throw new Error(`bw unlock failed (exit ${unlockResult.exitCode})`);
     }
     const session = unlockResult.stdout;
 
