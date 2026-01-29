@@ -1,4 +1,4 @@
-import { resolve } from "path";
+import { resolve } from "node:path";
 
 try {
   process.loadEnvFile(resolve(__dirname, "../../.env.e2e"));

@@ -1,24 +1,24 @@
-import { describe, test, expect, beforeAll, afterAll } from "vitest";
-import { spawn } from "child_process";
-import * as path from "path";
-import { MockDesktopServer } from "./mock-desktop-server";
+import { spawn } from "node:child_process";
+import * as path from "node:path";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { extractUserKey, getActiveUserId } from "./extract-user-key";
+import { MockDesktopServer } from "./mock-desktop-server";
+
+if (!process.env.BW_TEST_EMAIL || !process.env.BW_TEST_PASSWORD) {
+  throw new Error(
+    "E2E tests require BW_TEST_EMAIL and BW_TEST_PASSWORD environment variables",
+  );
+}
 
 const BW_TEST_EMAIL = process.env.BW_TEST_EMAIL;
 const BW_TEST_PASSWORD = process.env.BW_TEST_PASSWORD;
-
-if (!BW_TEST_EMAIL || !BW_TEST_PASSWORD) {
-  throw new Error(
-    "E2E tests require BW_TEST_EMAIL and BW_TEST_PASSWORD environment variables"
-  );
-}
 
 const bwbioPath = path.resolve(__dirname, "../../dist/index.js");
 
 function exec(
   command: string,
   args: string[],
-  env?: Record<string, string>
+  env?: Record<string, string>,
 ): Promise<{ stdout: string; output: string; exitCode: number }> {
   return new Promise((resolve) => {
     const child = spawn(command, args, {
@@ -44,7 +44,9 @@ function exec(
       const output = Buffer.concat(outputChunks).toString("utf-8").trim();
       const exitCode = code ?? 1;
       if (exitCode !== 0) {
-        console.error(`[${command} ${args.join(" ")}] exit ${exitCode}:\n${output}`);
+        console.error(
+          `[${command} ${args.join(" ")}] exit ${exitCode}:\n${output}`,
+        );
       }
       resolve({ stdout, output, exitCode });
     });
@@ -86,8 +88,8 @@ describe("bwbio E2E", () => {
     if (status.status === "unauthenticated") {
       const loginResult = await exec("bw", [
         "login",
-        BW_TEST_EMAIL!,
-        BW_TEST_PASSWORD!,
+        BW_TEST_EMAIL,
+        BW_TEST_PASSWORD,
         "--raw",
       ]);
       if (loginResult.exitCode !== 0) {
@@ -99,7 +101,7 @@ describe("bwbio E2E", () => {
     await bw(["sync"]);
 
     // 3. Unlock to get BW_SESSION
-    const unlockResult = await bw(["unlock", BW_TEST_PASSWORD!, "--raw"]);
+    const unlockResult = await bw(["unlock", BW_TEST_PASSWORD, "--raw"]);
     if (unlockResult.exitCode !== 0) {
       throw new Error(`bw unlock failed (exit ${unlockResult.exitCode})`);
     }
@@ -120,7 +122,6 @@ describe("bwbio E2E", () => {
     mockServer = new MockDesktopServer();
     mockSocketPath = mockServer.getSocketPath();
     mockServer.setUserKey(userKey);
-    mockServer.setUserId(userId);
     await mockServer.start();
   }, 60_000);
 
@@ -163,7 +164,7 @@ describe("bwbio E2E", () => {
     expect(result.exitCode).toBe(0);
     // status is a passthrough command — no IPC messages should be sent
     const ipcMessages = mockServer.receivedMessages.filter(
-      (m) => m.command !== "setupEncryption"
+      (m) => m.command !== "setupEncryption",
     );
     expect(ipcMessages).toHaveLength(0);
   });
@@ -177,7 +178,6 @@ describe("bwbio E2E", () => {
     // Restart for any subsequent tests
     mockServer = new MockDesktopServer(mockSocketPath);
     mockServer.setUserKey(userKey);
-    mockServer.setUserId(userId);
     await mockServer.start();
   });
 });

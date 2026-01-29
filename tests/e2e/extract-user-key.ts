@@ -1,7 +1,7 @@
-import * as crypto from "crypto";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 
 /**
  * Get the CLI data directory path for the current platform.
@@ -39,7 +39,7 @@ function readCliData(): Record<string, unknown> {
  */
 export function getActiveUserId(): string | null {
   const data = readCliData();
-  const userId = data["global_account_activeAccountId"];
+  const userId = data.global_account_activeAccountId;
   return typeof userId === "string" ? userId : null;
 }
 
@@ -65,7 +65,7 @@ export function extractUserKey(userId: string, sessionKey: string): string {
 
   if (typeof encrypted !== "string") {
     throw new Error(
-      `No encrypted user key found at ${storageKey} in data.json`
+      `No encrypted user key found at ${storageKey} in data.json`,
     );
   }
 
@@ -80,7 +80,7 @@ export function extractUserKey(userId: string, sessionKey: string): string {
   const encType = blob.readUInt8(0);
   if (encType !== 2) {
     throw new Error(
-      `Unexpected encryption type: ${encType} (expected 2 = AesCbc256_HmacSha256_B64)`
+      `Unexpected encryption type: ${encType} (expected 2 = AesCbc256_HmacSha256_B64)`,
     );
   }
 
@@ -91,9 +91,7 @@ export function extractUserKey(userId: string, sessionKey: string): string {
   // Decode session key
   const keyBytes = Buffer.from(sessionKey, "base64");
   if (keyBytes.length !== 64) {
-    throw new Error(
-      `Session key must be 64 bytes, got ${keyBytes.length}`
-    );
+    throw new Error(`Session key must be 64 bytes, got ${keyBytes.length}`);
   }
 
   const encKey = keyBytes.subarray(0, 32);

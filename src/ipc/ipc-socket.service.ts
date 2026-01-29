@@ -1,8 +1,8 @@
-import * as crypto from "crypto";
-import * as fs from "fs";
-import * as net from "net";
-import * as os from "os";
-import * as path from "path";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as net from "node:net";
+import * as os from "node:os";
+import * as path from "node:path";
 
 const DEBUG = process.env.BWBIO_DEBUG === "1";
 
@@ -70,7 +70,7 @@ export class IpcSocketService {
       "Library",
       "Group Containers",
       "LTZ2PFU5D6.com.bitwarden.desktop",
-      "s.bw"
+      "s.bw",
     );
 
     // Path for non-sandboxed Desktop app
@@ -79,7 +79,7 @@ export class IpcSocketService {
       "Library",
       "Caches",
       "com.bitwarden.desktop",
-      "s.bw"
+      "s.bw",
     );
 
     // Check sandboxed path first (most common for Mac App Store users)
@@ -232,7 +232,9 @@ export class IpcSocketService {
     messageBytes.copy(buffer, 4);
 
     if (DEBUG) {
-      console.error(`[DEBUG] Sending ${buffer.length} bytes (message: ${messageBytes.length} bytes)`);
+      console.error(
+        `[DEBUG] Sending ${buffer.length} bytes (message: ${messageBytes.length} bytes)`,
+      );
     }
 
     this.socket.write(buffer);

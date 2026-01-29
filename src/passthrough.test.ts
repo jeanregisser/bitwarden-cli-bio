@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import { isPassthroughCommand } from "./passthrough";
 
 describe("isPassthroughCommand", () => {
@@ -26,12 +26,14 @@ describe("isPassthroughCommand", () => {
   });
 
   describe("passthrough flags", () => {
-    test.each([[["--help"]], [["-h"]], [["--version"]], [["-v"]]])(
-      "%s is passthrough",
-      (args) => {
-        expect(isPassthroughCommand(args)).toBe(true);
-      }
-    );
+    test.each([
+      [["--help"]],
+      [["-h"]],
+      [["--version"]],
+      [["-v"]],
+    ])("%s is passthrough", (args) => {
+      expect(isPassthroughCommand(args)).toBe(true);
+    });
 
     test("help flag with command is passthrough", () => {
       expect(isPassthroughCommand(["get", "--help"])).toBe(true);

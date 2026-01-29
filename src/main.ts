@@ -1,6 +1,6 @@
-import { spawn } from "child_process";
-import { isPassthroughCommand } from "./passthrough";
+import { spawn } from "node:child_process";
 import { attemptBiometricUnlock } from "./biometrics";
+import { isPassthroughCommand } from "./passthrough";
 import { generateSessionKey, storeUserKeyForSession } from "./session-storage";
 
 /**
@@ -51,7 +51,7 @@ async function executeBw(args: string[], sessionKey?: string): Promise<number> {
  */
 async function handleUnlock(
   args: string[],
-  sessionKey: string
+  sessionKey: string,
 ): Promise<number> {
   // Check if --raw flag is present
   const isRaw = args.includes("--raw");
@@ -62,9 +62,7 @@ async function handleUnlock(
   } else {
     // Output in a format suitable for eval
     console.log(`export BW_SESSION="${sessionKey}"`);
-    console.log(
-      `# Run this command to set the session: eval $(bwbio unlock)`
-    );
+    console.log(`# Run this command to set the session: eval $(bwbio unlock)`);
   }
 
   return 0;
@@ -112,7 +110,7 @@ export async function main(args: string[]): Promise<number> {
 
   // Biometric unlock failed - always fall back to regular bw CLI
   console.error(
-    `Biometric unlock unavailable: ${result.error}. Falling back to CLI...`
+    `Biometric unlock unavailable: ${result.error}. Falling back to CLI...`,
   );
   return executeBw(args);
 }

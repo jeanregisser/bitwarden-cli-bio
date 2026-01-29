@@ -1,4 +1,4 @@
-import * as crypto from "crypto";
+import * as crypto from "node:crypto";
 import { IpcSocketService } from "./ipc-socket.service";
 
 const MESSAGE_VALID_TIMEOUT = 10 * 1000; // 10 seconds
@@ -170,7 +170,7 @@ export class NativeMessagingClient {
    */
   async callCommand(
     message: Message,
-    timeoutMs: number = DEFAULT_TIMEOUT
+    timeoutMs: number = DEFAULT_TIMEOUT,
   ): Promise<ReceivedMessage> {
     const messageId = this.messageId++;
 
@@ -178,7 +178,9 @@ export class NativeMessagingClient {
       const timeout = setTimeout(() => {
         if (this.callbacks.has(messageId)) {
           this.callbacks.delete(messageId);
-          rejecter(new Error("Message timed out waiting for Desktop app response"));
+          rejecter(
+            new Error("Message timed out waiting for Desktop app response"),
+          );
         }
       }, timeoutMs);
 
@@ -232,7 +234,7 @@ export class NativeMessagingClient {
         command: BiometricsCommands.UnlockWithBiometricsForUser,
         userId: userId,
       },
-      USER_INTERACTION_TIMEOUT
+      USER_INTERACTION_TIMEOUT,
     );
 
     if (response.response) {
@@ -262,18 +264,28 @@ export class NativeMessagingClient {
   /**
    * Encrypt a message using the secure channel's shared secret.
    */
-  private async encryptMessage(message: Message): Promise<EncryptedMessage | Message> {
+  private async encryptMessage(
+    message: Message,
+  ): Promise<EncryptedMessage | Message> {
     if (this.secureChannel?.sharedSecret == null) {
       await this.secureCommunication();
     }
 
+    // biome-ignore lint/style/noNonNullAssertion: guaranteed by secureCommunication() above
     const sharedSecret = this.secureChannel!.sharedSecret!;
     const messageJson = JSON.stringify(message);
 
     // Use AES-256-CBC encryption (matching Bitwarden's EncryptionType.AesCbc256_HmacSha256_B64 = 2)
     const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv("aes-256-cbc", sharedSecret.subarray(0, 32), iv);
-    const encrypted = Buffer.concat([cipher.update(messageJson, "utf8"), cipher.final()]);
+    const cipher = crypto.createCipheriv(
+      "aes-256-cbc",
+      sharedSecret.subarray(0, 32),
+      iv,
+    );
+    const encrypted = Buffer.concat([
+      cipher.update(messageJson, "utf8"),
+      cipher.final(),
+    ]);
 
     // Create HMAC using the second half of the key
     const macKey = sharedSecret.subarray(32, 64);
@@ -309,7 +321,10 @@ export class NativeMessagingClient {
    */
   private async handleMessage(message: ReceivedMessageOuter): Promise<void> {
     if (DEBUG) {
-      console.error(`[DEBUG] Received message:`, JSON.stringify(message, null, 2));
+      console.error(
+        `[DEBUG] Received message:`,
+        JSON.stringify(message, null, 2),
+      );
     }
 
     switch (message.command) {
@@ -324,7 +339,9 @@ export class NativeMessagingClient {
         if (message.appId !== this.appId) {
           return;
         }
-        const invalidError = new Error("Encryption channel invalidated by Desktop app");
+        const invalidError = new Error(
+          "Encryption channel invalidated by Desktop app",
+        );
         if (this.secureChannel?.setupReject) {
           this.secureChannel.setupReject(invalidError);
         }
@@ -341,7 +358,7 @@ export class NativeMessagingClient {
 
       case "wrongUserId": {
         const wrongUserError = new Error(
-          "Account mismatch: CLI and Desktop app are logged into different accounts"
+          "Account mismatch: CLI and Desktop app are logged into different accounts",
         );
         if (this.secureChannel?.setupReject) {
           this.secureChannel.setupReject(wrongUserError);
@@ -376,9 +393,13 @@ export class NativeMessagingClient {
   /**
    * Handle the setupEncryption response from the desktop app.
    */
-  private async handleSetupEncryption(message: ReceivedMessageOuter): Promise<void> {
+  private async handleSetupEncryption(
+    message: ReceivedMessageOuter,
+  ): Promise<void> {
     if (DEBUG) {
-      console.error(`[DEBUG] handleSetupEncryption called, sharedSecret present: ${message.sharedSecret != null}`);
+      console.error(
+        `[DEBUG] handleSetupEncryption called, sharedSecret present: ${message.sharedSecret != null}`,
+      );
     }
 
     if (message.sharedSecret == null) {
@@ -398,7 +419,9 @@ export class NativeMessagingClient {
     // Decrypt the shared secret using our private key (RSA-OAEP with SHA-1)
     const encrypted = Buffer.from(message.sharedSecret, "base64");
     if (DEBUG) {
-      console.error(`[DEBUG] Encrypted sharedSecret length: ${encrypted.length}`);
+      console.error(
+        `[DEBUG] Encrypted sharedSecret length: ${encrypted.length}`,
+      );
     }
 
     const decrypted = crypto.privateDecrypt(
@@ -407,13 +430,15 @@ export class NativeMessagingClient {
         oaepHash: "sha1",
         padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
       },
-      encrypted
+      encrypted,
     );
 
     this.secureChannel.sharedSecret = decrypted;
 
     if (DEBUG) {
-      console.error(`[DEBUG] Decrypted sharedSecret length: ${this.secureChannel.sharedSecret.length}`);
+      console.error(
+        `[DEBUG] Decrypted sharedSecret length: ${this.secureChannel.sharedSecret.length}`,
+      );
     }
 
     if (this.secureChannel.setupResolve) {
@@ -425,7 +450,7 @@ export class NativeMessagingClient {
    * Handle an encrypted message from the desktop app.
    */
   private async handleEncryptedMessage(
-    rawMessage: ReceivedMessage | EncryptedMessage
+    rawMessage: ReceivedMessage | EncryptedMessage,
   ): Promise<void> {
     if (this.secureChannel?.sharedSecret == null) {
       return;
@@ -456,7 +481,10 @@ export class NativeMessagingClient {
 
       // Decrypt
       const decipher = crypto.createDecipheriv("aes-256-cbc", encKey, iv);
-      const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
+      const decrypted = Buffer.concat([
+        decipher.update(data),
+        decipher.final(),
+      ]);
       message = JSON.parse(decrypted.toString("utf8"));
     } else {
       message = rawMessage as ReceivedMessage;
@@ -470,12 +498,17 @@ export class NativeMessagingClient {
    */
   private processDecryptedMessage(message: ReceivedMessage): void {
     if (DEBUG) {
-      console.error(`[DEBUG] Decrypted message:`, JSON.stringify(message, null, 2));
+      console.error(
+        `[DEBUG] Decrypted message:`,
+        JSON.stringify(message, null, 2),
+      );
     }
 
     if (Math.abs(message.timestamp - Date.now()) > MESSAGE_VALID_TIMEOUT) {
       if (DEBUG) {
-        console.error(`[DEBUG] Message too old, ignoring. Timestamp: ${message.timestamp}, now: ${Date.now()}`);
+        console.error(
+          `[DEBUG] Message too old, ignoring. Timestamp: ${message.timestamp}, now: ${Date.now()}`,
+        );
       }
       return;
     }
@@ -483,6 +516,7 @@ export class NativeMessagingClient {
     const messageId = message.messageId;
 
     if (this.callbacks.has(messageId)) {
+      // biome-ignore lint/style/noNonNullAssertion: guaranteed by .has() check above
       const callback = this.callbacks.get(messageId)!;
       clearTimeout(callback.timeout);
       this.callbacks.delete(messageId);
@@ -517,7 +551,20 @@ export class NativeMessagingClient {
     };
 
     if (DEBUG) {
-      console.error(`[DEBUG] Sending setupEncryption:`, JSON.stringify({ ...setupMessage, message: { ...setupMessage.message, publicKey: publicKeyB64.slice(0, 50) + "..." } }, null, 2));
+      console.error(
+        `[DEBUG] Sending setupEncryption:`,
+        JSON.stringify(
+          {
+            ...setupMessage,
+            message: {
+              ...setupMessage.message,
+              publicKey: `${publicKeyB64.slice(0, 50)}...`,
+            },
+          },
+          null,
+          2,
+        ),
+      );
     }
 
     this.postMessage(setupMessage);
@@ -548,7 +595,10 @@ export class NativeMessagingClient {
     }
 
     // Generate fingerprint from public key
-    const publicKeyDer = this.secureChannel.publicKey.export({ type: "spki", format: "der" });
+    const publicKeyDer = this.secureChannel.publicKey.export({
+      type: "spki",
+      format: "der",
+    });
     const hash = crypto.createHash("sha256").update(publicKeyDer).digest();
 
     // Format as 5 groups of alphanumeric characters (like Bitwarden)
@@ -563,7 +613,9 @@ export class NativeMessagingClient {
 
     console.error("");
     console.error(`${bold}Bitwarden Desktop App Verification${reset}`);
-    console.error("Verify this fingerprint matches the one shown in the Desktop app:");
+    console.error(
+      "Verify this fingerprint matches the one shown in the Desktop app:",
+    );
     console.error("");
     console.error(`${dim}  ${cyan}${formatted}${reset}`);
     console.error("");

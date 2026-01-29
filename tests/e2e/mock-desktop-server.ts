@@ -1,8 +1,8 @@
-import * as net from "net";
-import * as crypto from "crypto";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as net from "node:net";
+import * as os from "node:os";
+import * as path from "node:path";
 
 /**
  * Mock Desktop IPC server for E2E testing.
@@ -20,17 +20,13 @@ export class MockDesktopServer {
 
   // Configurable responses
   private _biometricsStatus = 0; // BiometricsStatus.Available
-  private _userId = "test-user-id";
   private _userKey = "test-user-key-base64";
 
   // Message tracking
   private _receivedMessages: Array<{ command: string; payload?: unknown }> = [];
 
   // Encryption state per connection
-  private connectionStates = new Map<
-    net.Socket,
-    { sharedSecret: Buffer }
-  >();
+  private connectionStates = new Map<net.Socket, { sharedSecret: Buffer }>();
 
   constructor(socketPath?: string) {
     this.socketPath = socketPath ?? this.getDefaultSocketPath();
@@ -91,10 +87,6 @@ export class MockDesktopServer {
     this._biometricsStatus = status;
   }
 
-  setUserId(userId: string): void {
-    this._userId = userId;
-  }
-
   setUserKey(key: string): void {
     this._userKey = key;
   }
@@ -122,7 +114,9 @@ export class MockDesktopServer {
         const messageLength = buffer.readUInt32LE(0);
         if (buffer.length < 4 + messageLength) break;
 
-        const messageJson = buffer.subarray(4, 4 + messageLength).toString("utf8");
+        const messageJson = buffer
+          .subarray(4, 4 + messageLength)
+          .toString("utf8");
         buffer = buffer.subarray(4 + messageLength);
 
         try {
@@ -150,7 +144,7 @@ export class MockDesktopServer {
    */
   private handleOuterMessage(
     socket: net.Socket,
-    outer: { appId: string; message: Record<string, unknown> }
+    outer: { appId: string; message: Record<string, unknown> },
   ): void {
     const msg = outer.message;
     const appId = outer.appId;
@@ -171,7 +165,7 @@ export class MockDesktopServer {
   private handleSetupEncryption(
     socket: net.Socket,
     appId: string,
-    msg: Record<string, unknown>
+    msg: Record<string, unknown>,
   ): void {
     const publicKeyB64 = msg.publicKey as string;
     if (!publicKeyB64) return;
@@ -194,7 +188,7 @@ export class MockDesktopServer {
         oaepHash: "sha1",
         padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
       },
-      sharedSecret
+      sharedSecret,
     );
 
     this.connectionStates.set(socket, { sharedSecret });
@@ -212,7 +206,7 @@ export class MockDesktopServer {
   private handleEncryptedMessage(
     socket: net.Socket,
     appId: string,
-    msg: Record<string, unknown>
+    msg: Record<string, unknown>,
   ): void {
     const state = this.connectionStates.get(socket);
     if (!state) return;

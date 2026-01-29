@@ -25,6 +25,7 @@ jobs:
           node-version: "22"
           cache: "npm"
       - run: npm ci
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm install -g @bitwarden/cli
       - run: npm run build

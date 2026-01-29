@@ -1,6 +1,6 @@
 export { IpcSocketService } from "./ipc-socket.service";
 export {
-  NativeMessagingClient,
   BiometricsCommands,
   BiometricsStatus,
+  NativeMessagingClient,
 } from "./native-messaging-client";

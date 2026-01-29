@@ -1,5 +1,5 @@
-import * as crypto from "crypto";
-import { NativeMessagingClient, BiometricsStatus } from "./ipc";
+import * as crypto from "node:crypto";
+import { BiometricsStatus, NativeMessagingClient } from "./ipc";
 import { getActiveUserId } from "./session-storage";
 
 /**
@@ -36,7 +36,7 @@ function generateAppId(): string {
  * Attempt to unlock the vault using biometrics via the Desktop app.
  */
 export async function attemptBiometricUnlock(
-  options: BiometricUnlockOptions = {}
+  options: BiometricUnlockOptions = {},
 ): Promise<BiometricUnlockResult> {
   // Get the user ID from CLI data - this is required for the desktop app
   const userId = options.userId || getActiveUserId();
@@ -75,7 +75,8 @@ export async function attemptBiometricUnlock(
 
     // BiometricsStatus is an enum - Available (0) means biometrics can be used
     if (userStatus !== BiometricsStatus.Available) {
-      const statusName = BiometricsStatus[userStatus] || `Unknown(${userStatus})`;
+      const statusName =
+        BiometricsStatus[userStatus] || `Unknown(${userStatus})`;
       return {
         success: false,
         error: `Biometrics not available: ${statusName}`,
