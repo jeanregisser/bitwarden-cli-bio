@@ -24,6 +24,8 @@ function exec(
     const child = spawn(command, args, {
       env: { ...process.env, ...env },
       timeout: 30_000,
+      // On Windows, spawn needs shell to resolve .cmd wrappers (e.g. bw.cmd)
+      shell: process.platform === "win32",
     });
 
     const stdoutChunks: Buffer[] = [];
