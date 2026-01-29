@@ -37,6 +37,10 @@ export class MockDesktopServer {
   }
 
   private getDefaultSocketPath(): string {
+    if (process.platform === "win32") {
+      // Windows requires named pipes, not Unix domain sockets
+      return "\\\\.\\pipe\\bwbio-e2e-test";
+    }
     const dir = path.join(os.tmpdir(), "bwbio-e2e-test");
     fs.mkdirSync(dir, { recursive: true });
     return path.join(dir, "s.bw");
