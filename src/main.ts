@@ -32,6 +32,8 @@ async function executeBw(args: string[], sessionKey?: string): Promise<number> {
     const child = spawn(getBwPath(), args, {
       stdio: "inherit",
       env,
+      // On Windows, spawn needs shell to resolve .cmd wrappers (e.g. bw.cmd)
+      shell: process.platform === "win32",
     });
 
     child.on("error", (err) => {
