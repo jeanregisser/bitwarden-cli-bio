@@ -6,11 +6,10 @@ import { generateSessionKey, storeUserKeyForSession } from "./session-storage";
 /**
  * Get the path to the official bw CLI.
  *
- * Looks for 'bw' in PATH, excluding our own wrapper if it's aliased.
+ * Shell aliases don't apply when spawning via child_process,
+ * so aliasing bwbio as bw won't cause a conflict here.
  */
 function getBwPath(): string {
-  // For now, just use 'bw' and let the shell resolve it
-  // TODO: Handle case where bwbio is aliased as bw
   return "bw";
 }
 
