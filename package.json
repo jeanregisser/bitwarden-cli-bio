@@ -1,14 +1,15 @@
 {
   "name": "bitwarden-cli-bio",
   "version": "0.1.0",
-  "description": "A drop-in replacement for the Bitwarden CLI that adds biometric unlock support via the Desktop app",
+  "description": "A CLI wrapper for Bitwarden that adds biometric unlock support via the Desktop app",
+  "type": "module",
   "main": "dist/index.js",
   "bin": {
     "bwbio": "dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs --dts --clean",
-    "dev": "tsup src/index.ts --format cjs --watch",
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --watch",
     "test": "vitest run --project unit",
     "test:e2e": "vitest run --project e2e",
     "test:watch": "vitest",
@@ -22,7 +23,18 @@
     "touchid",
     "windows-hello"
   ],
-  "author": "",
+  "author": "Jean Regisser",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeanregisser/bitwarden-cli-bio.git"
+  },
+  "homepage": "https://github.com/jeanregisser/bitwarden-cli-bio",
+  "bugs": {
+    "url": "https://github.com/jeanregisser/bitwarden-cli-bio/issues"
+  },
+  "files": [
+    "dist"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=22"
