@@ -74,7 +74,7 @@ login, logout, lock, config, update, completion, status, serve
 
 Everything else triggers biometric unlock if the vault is locked.
 
-## Environment Variables
+## Environment variables
 
 | Variable | Description |
 |----------|-------------|
@@ -89,6 +89,14 @@ Everything else triggers biometric unlock if the vault is locked.
 - **Linux** — Polkit — should work, not yet tested
 
 The IPC protocol is the same across platforms. If you try Windows or Linux, please [open an issue](https://github.com/jeanregisser/bitwarden-cli-bio/issues) and let us know how it goes!
+
+## Supply chain trust
+
+Every npm release is automatically built and published from CI via [semantic-release](https://github.com/semantic-release/semantic-release), with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) enabled. This means:
+
+- No human runs `npm publish` — releases come directly from GitHub Actions
+- Each package on npm links back to the exact source commit and CI run that produced it
+- You can verify this on the [npm package page](https://www.npmjs.com/package/bitwarden-cli-bio) (look for the "Provenance" badge)
 
 ## Background
 

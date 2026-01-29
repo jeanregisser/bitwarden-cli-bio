@@ -1,6 +1,6 @@
 {
   "name": "bitwarden-cli-bio",
-  "version": "0.1.0",
+  "version": "0.0.0-semantic-release",
   "description": "A CLI wrapper for Bitwarden that adds biometric unlock support via the Desktop app",
   "type": "module",
   "main": "dist/index.js",
@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "release": "semantic-release"
   },
   "keywords": [
     "bitwarden",
@@ -41,9 +42,19 @@
   "engines": {
     "node": ">=22"
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "release": {
+    "branches": ["main"],
+    "preset": "conventionalcommits"
+  },
   "devDependencies": {
     "@biomejs/biome": "2.3.13",
     "@types/node": "^20.10.0",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
+    "semantic-release": "^24.0.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"

@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version-file: 'package.json'
           cache: "npm"
       - run: npm ci
       - run: npm run lint
@@ -35,3 +35,25 @@ jobs:
           BW_TEST_EMAIL: ${{ secrets.BW_TEST_EMAIL }}
           BW_TEST_PASSWORD: ${{ secrets.BW_TEST_PASSWORD }}
           BW_TEST_SERVER: ${{ vars.BW_TEST_SERVER }}
+
+  publish:
+    if: github.ref == 'refs/heads/main'
+    needs: [test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to be able to publish a GitHub release
+      issues: write # to be able to comment on released issues
+      pull-requests: write # to be able to comment on released pull requests
+      id-token: write # to enable use of OIDC for npm trusted publishing and provenance
+    environment: npm-publish # extra protection for publishing to npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - run: npm run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
