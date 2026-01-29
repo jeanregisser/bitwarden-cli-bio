@@ -1,19 +1,26 @@
 # bitwarden-cli-bio
 
-A CLI wrapper for Bitwarden that adds biometric unlock support via the Desktop app.
+Unlock your Bitwarden CLI vault with biometrics (Touch ID, Windows Hello, Linux Polkit) instead of typing your master password. Again. And again.
 
-## Why?
+```bash
+# before: ugh
+bw get password github
+? Master password: [type your 30-character password]
 
-The official `bw` CLI requires typing your master password every time you unlock. This wrapper brings biometric unlock (Touch ID, Windows Hello, Polkit) to the CLI by talking to the Desktop app over IPC — the same way the browser extension does.
+# after: nice
+bwbio get password github
+# [Touch ID prompt] → done
+```
 
-This should ideally be built into the official CLI — a [PR was proposed](https://github.com/bitwarden/clients/pull/18273) but was closed by the Bitwarden team citing maintenance concerns until they have a proper IPC framework. This standalone wrapper fills the gap in the meantime.
+## How?
 
-## How It Works
+`bwbio` talks to the Bitwarden Desktop app over IPC — the same protocol the browser extension uses — to unlock your vault with biometrics. Then it hands off to the official `bw` CLI with the session key. You still need `bw` installed; `bwbio` just handles the unlock part.
 
 ```
 ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
-│  bitwarden-cli  │   IPC   │    Bitwarden    │  System │    Touch ID /   │
-│      -bio       │ ◄─────► │   Desktop App   │ ◄─────► │  Windows Hello  │
+│                 │         │    Bitwarden    │         │   Touch ID /    │
+│      bwbio      │   IPC   │    Desktop      │  System │  Windows Hello  │
+│                 │ ◄─────► │    App          │ ◄─────► │  Linux Polkit   │
 └─────────────────┘         └─────────────────┘         └─────────────────┘
         │
         │ delegates (with BW_SESSION)
@@ -24,31 +31,16 @@ This should ideally be built into the official CLI — a [PR was proposed](https
 └─────────────────┘
 ```
 
-### Decision Flow
+If biometrics fail for any reason (Desktop app closed, prompt cancelled, etc.), it falls back to the regular password prompt. It never blocks you.
 
-```
-bwbio <args>
-    │
-    ├─► BW_SESSION already set?
-    │       └─► YES → delegate to bw immediately
-    │
-    ├─► Command is passthrough? (login, logout, status, --help, etc.)
-    │       └─► YES → delegate to bw immediately
-    │
-    └─► Vault locked & command needs unlock?
-            └─► Attempt biometric unlock via Desktop IPC
-                    │
-                    ├─► Success → delegate to bw with BW_SESSION
-                    └─► Failure → fall back to bw unlock (password prompt)
-```
+## Setup
 
-## Prerequisites
+**You'll need:**
+- Bitwarden Desktop app with biometrics enabled + "Allow browser integration" on
+- Node.js >= 22
+- Official `bw` CLI in your PATH
 
-- **Bitwarden Desktop app** with biometrics enabled and "Allow browser integration" turned on
-- **Node.js** >= 22
-- **Official `bw` CLI** installed and available in PATH
-
-## Install
+**Install:**
 
 ```bash
 npm install -g bitwarden-cli-bio
@@ -57,46 +49,50 @@ npm install -g bitwarden-cli-bio
 ## Usage
 
 ```bash
-# Use it like bw — biometric unlock happens automatically
-bwbio list items --search github
+# The magic: alias it and forget about it
+alias bw=bwbio
+bw get password github        # Touch ID, done
+bw list items --search email  # still Touch ID, still done
+
+# Or use it directly
 bwbio get password github
 
-# Explicit unlock for scripts (outputs BW_SESSION export)
+# For scripts — get a session key
 eval $(bwbio unlock)
-
-# Or alias it for seamless use
-alias bw=bwbio
-bw get password github  # uses biometrics automatically
 ```
 
-If `BW_SESSION` is already set, all commands pass through directly to `bw` without any unlock attempt.
+If `BW_SESSION` is already set, `bwbio` stays out of the way and passes everything straight to `bw`.
 
-## Passthrough Commands
+### Commands that skip biometrics
 
-These commands are passed directly to `bw` without attempting unlock:
+Some commands don't need an unlocked vault and go directly to `bw`:
 
 ```
 login, logout, lock, config, update, completion, status, serve
 --help / -h, --version / -v
 ```
 
-All other commands trigger biometric unlock if the vault is locked.
+Everything else triggers biometric unlock if the vault is locked.
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `BW_SESSION` | If set, all commands pass through to `bw` directly (no biometric unlock attempt) |
-| `BWBIO_VERBOSE` | Set to `1` to enable verbose IPC logging |
+| `BW_SESSION` | Already set? `bwbio` passes through to `bw` directly |
+| `BWBIO_VERBOSE` | Set to `1` for verbose IPC logging |
 | `BWBIO_IPC_SOCKET_PATH` | Override the IPC socket path (advanced) |
 
 ## Platforms
 
-- **macOS** — Touch ID (including sandboxed App Store builds of Bitwarden Desktop) ✅ Tested
-- **Windows** — Windows Hello (untested — feedback welcome)
-- **Linux** — Polkit (untested — feedback welcome)
+- **macOS** — Touch ID (including App Store builds) — tested
+- **Windows** — Windows Hello — should work, not yet tested
+- **Linux** — Polkit — should work, not yet tested
 
-The IPC protocol is the same across platforms, so Windows and Linux should work but haven't been verified yet. If you try it, please [open an issue](https://github.com/jeanregisser/bitwarden-cli-bio/issues) with your results.
+The IPC protocol is the same across platforms. If you try Windows or Linux, please [open an issue](https://github.com/jeanregisser/bitwarden-cli-bio/issues) and let us know how it goes!
+
+## Background
+
+This should really be a feature of the official CLI. A [PR was proposed](https://github.com/bitwarden/clients/pull/18273) but was closed — the Bitwarden team wants to wait until they have a proper IPC framework. This wrapper fills the gap in the meantime using the same IPC code from that PR.
 
 ## License
 
