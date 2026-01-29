@@ -9,7 +9,8 @@
     "includes": ["**", "!!**/dist", "!!**/vendor", "!!**/node_modules"]
   },
   "formatter": {
-    "indentStyle": "space"
+    "indentStyle": "space",
+    "includes": ["**", "!package.json", "!package-lock.json"]
   },
   "linter": {
     "enabled": true,
