@@ -97,7 +97,7 @@ export async function main(args: string[]): Promise<number> {
     verbose: process.env.BWBIO_VERBOSE === "1",
   });
 
-  if (result.success && result.userKeyB64 && result.userId) {
+  if (result.success) {
     // Generate a new session key and store the user key
     const sessionKey = generateSessionKey();
     storeUserKeyForSession(result.userKeyB64, result.userId, sessionKey);
@@ -111,15 +111,9 @@ export async function main(args: string[]): Promise<number> {
     return executeBw(args, sessionKey);
   }
 
-  // Biometric unlock failed - fall back to bw
-  if (result.shouldFallback) {
-    console.error(
-      `Biometric unlock unavailable: ${result.error}. Falling back to CLI...`
-    );
-    return executeBw(args);
-  }
-
-  // Non-recoverable error
-  console.error(`Biometric unlock failed: ${result.error}`);
-  return 1;
+  // Biometric unlock failed - always fall back to regular bw CLI
+  console.error(
+    `Biometric unlock unavailable: ${result.error}. Falling back to CLI...`
+  );
+  return executeBw(args);
 }

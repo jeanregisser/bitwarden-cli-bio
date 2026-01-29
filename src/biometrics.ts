@@ -5,15 +5,17 @@ import { getActiveUserId } from "./session-storage";
 /**
  * Result of a biometric unlock attempt.
  */
-export interface BiometricUnlockResult {
-  success: boolean;
-  /** The user's encryption key (base64 encoded) - NOT the session key */
-  userKeyB64?: string;
-  /** The user ID */
-  userId?: string;
-  error?: string;
-  shouldFallback: boolean;
-}
+export type BiometricUnlockResult =
+  | {
+      success: true;
+      /** The user's encryption key (base64 encoded) - NOT the session key */
+      userKeyB64: string;
+      userId: string;
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
 /**
  * Options for biometric unlock.
@@ -42,7 +44,6 @@ export async function attemptBiometricUnlock(
     return {
       success: false,
       error: "No user ID available - please log in first",
-      shouldFallback: true,
     };
   }
 
@@ -56,7 +57,6 @@ export async function attemptBiometricUnlock(
       return {
         success: false,
         error: "Bitwarden Desktop app is not running",
-        shouldFallback: true,
       };
     }
 
@@ -79,7 +79,6 @@ export async function attemptBiometricUnlock(
       return {
         success: false,
         error: `Biometrics not available: ${statusName}`,
-        shouldFallback: true,
       };
     }
 
@@ -94,7 +93,6 @@ export async function attemptBiometricUnlock(
       return {
         success: false,
         error: "Biometric unlock was denied or failed",
-        shouldFallback: true,
       };
     }
 
@@ -102,18 +100,13 @@ export async function attemptBiometricUnlock(
       success: true,
       userKeyB64: userKey,
       userId,
-      shouldFallback: false,
     };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
 
-    // Determine if we should fall back to password unlock
-    const shouldFallback = isRecoverableError(error);
-
     return {
       success: false,
       error,
-      shouldFallback,
     };
   } finally {
     client.disconnect();
@@ -146,24 +139,4 @@ export async function checkBiometricsAvailable(): Promise<boolean> {
   } finally {
     client.disconnect();
   }
-}
-
-/**
- * Determine if an error is recoverable (should fall back to password).
- */
-function isRecoverableError(error: string): boolean {
-  const recoverable = [
-    "ENOENT",
-    "ECONNREFUSED",
-    "timed out",
-    "not running",
-    "not available",
-    "not enabled",
-    "canceled",
-    "denied",
-    "failed",
-  ];
-
-  const lowerError = error.toLowerCase();
-  return recoverable.some((pattern) => lowerError.includes(pattern.toLowerCase()));
 }
