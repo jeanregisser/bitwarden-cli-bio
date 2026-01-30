@@ -79,7 +79,10 @@ Everything else triggers biometric unlock if the vault is locked.
 | Variable | Description |
 |----------|-------------|
 | `BW_SESSION` | Already set? `bwbio` passes through to `bw` directly |
-| `BWBIO_VERBOSE` | Set to `1` for verbose IPC logging |
+| `BW_QUIET` | Set to `true` to suppress all biometric-related messages |
+| `BW_NOINTERACTION` | Set to `true` to skip biometric unlock (requires user interaction) |
+| `BWBIO_VERBOSE` | Set to `true` for verbose logging |
+| `BWBIO_DEBUG` | Set to `true` for raw IPC message dumps |
 | `BWBIO_IPC_SOCKET_PATH` | Override the IPC socket path (advanced) |
 
 ## Platforms

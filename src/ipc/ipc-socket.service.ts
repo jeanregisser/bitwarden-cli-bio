@@ -4,7 +4,7 @@ import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 
-const DEBUG = process.env.BWBIO_DEBUG === "1";
+const DEBUG = process.env.BWBIO_DEBUG === "true";
 
 /**
  * Platform-specific IPC socket service for connecting to the Bitwarden desktop app.

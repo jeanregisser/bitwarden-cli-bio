@@ -29,7 +29,7 @@ Run these before releases:
 - [ ] Biometrics disabled in Desktop → shows message, falls back
 
 ## Environment Variables
-- [ ] `BWBIO_VERBOSE=1` shows debug output
+- [ ] `BWBIO_VERBOSE=true` shows debug output
 - [ ] Existing `BW_SESSION` is respected (no unlock attempt)
 
 ## Cross-Platform (if applicable)

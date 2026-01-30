@@ -3,6 +3,12 @@ import { attemptBiometricUnlock } from "./biometrics";
 import { isPassthroughCommand } from "./passthrough";
 import { generateSessionKey, storeUserKeyForSession } from "./session-storage";
 
+function writeLn(s: string): void {
+  if (process.env.BW_QUIET !== "true") {
+    process.stdout.write(`${s}\n`);
+  }
+}
+
 /**
  * Get the path to the official bw CLI.
  *
@@ -57,12 +63,10 @@ async function handleUnlock(
   const isRaw = args.includes("--raw");
 
   if (isRaw) {
-    // Just output the session key
-    console.log(sessionKey);
+    writeLn(sessionKey);
   } else {
-    // Output in a format suitable for eval
-    console.log(`export BW_SESSION="${sessionKey}"`);
-    console.log(`# Run this command to set the session: eval $(bwbio unlock)`);
+    writeLn(`export BW_SESSION="${sessionKey}"`);
+    writeLn(`# Run this command to set the session: eval $(bwbio unlock)`);
   }
 
   return 0;
@@ -71,28 +75,29 @@ async function handleUnlock(
 /**
  * Main entry point for the CLI wrapper.
  *
- * Decision flow:
- * 1. If BW_SESSION is already set, pass through to bw
- * 2. If command is passthrough, delegate to bw directly
- * 3. Otherwise, attempt biometric unlock and delegate with session
+ * Attempts biometric unlock via the Desktop app, then delegates to bw.
+ * Skips biometrics when BW_SESSION is set, in non-interactive mode, or for passthrough commands.
  */
 export async function main(args: string[]): Promise<number> {
-  // 1. Check if BW_SESSION is already set
-  if (process.env.BW_SESSION) {
+  // Mirror --quiet and --nointeraction flags to env vars (same as bw CLI)
+  if (args.includes("--quiet")) {
+    process.env.BW_QUIET = "true";
+  }
+  if (args.includes("--nointeraction")) {
+    process.env.BW_NOINTERACTION = "true";
+  }
+
+  // Skip biometric unlock when not needed or not possible
+  if (
+    process.env.BW_SESSION ||
+    process.env.BW_NOINTERACTION === "true" ||
+    isPassthroughCommand(args)
+  ) {
     return executeBw(args);
   }
 
-  // 2. Check if this is a passthrough command
-  if (isPassthroughCommand(args)) {
-    return executeBw(args);
-  }
-
-  // 3. Attempt biometric unlock
-  console.error("Attempting biometric unlock...");
-
-  const result = await attemptBiometricUnlock({
-    verbose: process.env.BWBIO_VERBOSE === "1",
-  });
+  // Attempt biometric unlock
+  const result = await attemptBiometricUnlock();
 
   if (result.success) {
     // Generate a new session key and store the user key
@@ -108,9 +113,6 @@ export async function main(args: string[]): Promise<number> {
     return executeBw(args, sessionKey);
   }
 
-  // Biometric unlock failed - always fall back to regular bw CLI
-  console.error(
-    `Biometric unlock unavailable: ${result.error}. Falling back to CLI...`,
-  );
+  // Biometric unlock failed or unavailable - fall back to regular bw CLI
   return executeBw(args);
 }

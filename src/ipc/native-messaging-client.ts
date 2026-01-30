@@ -5,7 +5,7 @@ const MESSAGE_VALID_TIMEOUT = 10 * 1000; // 10 seconds
 const DEFAULT_TIMEOUT = 10 * 1000; // 10 seconds for protocol messages
 const USER_INTERACTION_TIMEOUT = 60 * 1000; // 60 seconds for biometric prompts
 
-const DEBUG = process.env.BWBIO_DEBUG === "1";
+const DEBUG = process.env.BWBIO_DEBUG === "true";
 
 /**
  * Biometrics commands matching the desktop app's expected commands.
