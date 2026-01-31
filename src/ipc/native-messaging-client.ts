@@ -602,7 +602,6 @@ export class NativeMessagingClient {
     const phrase = getFingerprint(this.appId, publicKeyDer);
     const formatted = phrase.join("-");
 
-    const dim = "\x1b[2m";
     const cyan = "\x1b[36m";
     const bold = "\x1b[1m";
     const reset = "\x1b[0m";
@@ -613,7 +612,7 @@ export class NativeMessagingClient {
       "Verify this fingerprint matches the one shown in the Desktop app:",
     );
     console.error("");
-    console.error(`${dim}  ${cyan}${formatted}${reset}`);
+    console.error(`  ${cyan}${formatted}${reset}`);
     console.error("");
     console.error("Accept the connection in the Desktop app to continue.");
     console.error("");
