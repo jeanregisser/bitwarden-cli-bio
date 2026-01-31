@@ -11,9 +11,7 @@ describe("getFingerprint", () => {
       true,
     );
     // Pin the exact output to detect algorithm regressions
-    expect(phrase.join("-")).toBe(
-      "carve-bulldozer-retake-bath-crust",
-    );
+    expect(phrase.join("-")).toBe("carve-bulldozer-retake-bath-crust");
   });
 
   it("produces different phrases for different fingerprint material", () => {

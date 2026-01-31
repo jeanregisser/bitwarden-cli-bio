@@ -5,11 +5,7 @@ import { EFFLongWordList } from "./wordlist";
  * HKDF-Expand (RFC 5869) - the expand step only.
  * Derives output keying material from a pseudorandom key.
  */
-function hkdfExpand(
-  prk: Buffer,
-  info: string,
-  outputLength: number,
-): Buffer {
+function hkdfExpand(prk: Buffer, info: string, outputLength: number): Buffer {
   const hashLen = 32; // SHA-256 output length
   const n = Math.ceil(outputLength / hashLen);
   const okm = Buffer.alloc(n * hashLen);
