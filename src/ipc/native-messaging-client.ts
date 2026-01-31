@@ -1,4 +1,5 @@
 import * as crypto from "node:crypto";
+import { getFingerprint } from "../fingerprint";
 import { IpcSocketService } from "./ipc-socket.service";
 
 const MESSAGE_VALID_TIMEOUT = 10 * 1000; // 10 seconds
@@ -594,18 +595,13 @@ export class NativeMessagingClient {
       return;
     }
 
-    // Generate fingerprint from public key
     const publicKeyDer = this.secureChannel.publicKey.export({
       type: "spki",
       format: "der",
     });
-    const hash = crypto.createHash("sha256").update(publicKeyDer).digest();
+    const phrase = getFingerprint(this.appId, publicKeyDer);
+    const formatted = phrase.join("-");
 
-    // Format as 5 groups of alphanumeric characters (like Bitwarden)
-    const fingerprint = hash.toString("hex").slice(0, 25).toUpperCase();
-    const formatted = fingerprint.match(/.{1,5}/g)?.join("-") || fingerprint;
-
-    // Write to stderr so it doesn't interfere with command output
     const dim = "\x1b[2m";
     const cyan = "\x1b[36m";
     const bold = "\x1b[1m";
