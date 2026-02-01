@@ -35,12 +35,17 @@ async function executeBw(args: string[], sessionKey?: string): Promise<number> {
       env.BW_SESSION = sessionKey;
     }
 
-    const child = spawn(getBwPath(), args, {
-      stdio: "inherit",
-      env,
-      // On Windows, spawn needs shell to resolve .cmd wrappers (e.g. bw.cmd)
-      shell: process.platform === "win32",
-    });
+    // On Windows, spawn needs shell to resolve .cmd wrappers (e.g. bw.cmd).
+    // Use string form (no args array) to avoid DEP0190: passing args with
+    // shell:true is deprecated because they are concatenated, not escaped.
+    const child =
+      process.platform === "win32"
+        ? spawn([getBwPath(), ...args].join(" "), {
+            stdio: "inherit",
+            env,
+            shell: true,
+          })
+        : spawn(getBwPath(), args, { stdio: "inherit", env });
 
     child.on("error", (err) => {
       console.error(`Failed to execute bw: ${err.message}`);
