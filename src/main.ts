@@ -87,9 +87,12 @@ export async function main(args: string[]): Promise<number> {
     process.env.BW_NOINTERACTION = "true";
   }
 
-  // Skip biometric unlock when not needed or not possible
+  // Skip biometric unlock when not needed or not possible.
+  // Note: explicit 'unlock' command always attempts biometrics, even if BW_SESSION
+  // is set (e.g. after lock → unlock in the same shell session).
+  const isUnlockCommand = args[0] === "unlock";
   if (
-    process.env.BW_SESSION ||
+    (process.env.BW_SESSION && !isUnlockCommand) ||
     process.env.BW_NOINTERACTION === "true" ||
     isPassthroughCommand(args)
   ) {

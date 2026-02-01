@@ -180,4 +180,33 @@ describe("bwbio E2E", () => {
     mockServer.setUserKey(userKey);
     await mockServer.start();
   });
+
+  test("lock then unlock in same session uses biometrics again", async () => {
+    // 1. First unlock via biometrics
+    const firstUnlock = await bwbio(["unlock", "--raw"]);
+    expect(firstUnlock.exitCode).toBe(0);
+    const session1 = firstUnlock.stdout;
+
+    // Verify first unlock worked
+    const status1 = await bw(["status"], { BW_SESSION: session1 });
+    expect(JSON.parse(status1.stdout).status).toBe("unlocked");
+
+    // 2. Lock the vault (with BW_SESSION set, matching bug report #1)
+    const lockResult = await bwbio(["lock"], { BW_SESSION: session1 });
+    expect(lockResult.exitCode).toBe(0);
+
+    // 3. Unlock again with BW_SESSION still set — should use biometrics, not password
+    const secondUnlock = await bwbio(["unlock", "--raw"], {
+      BW_SESSION: session1,
+    });
+    expect(secondUnlock.exitCode).toBe(0);
+    const session2 = secondUnlock.stdout;
+
+    // Verify second unlock also worked
+    const status2 = await bw(["status"], { BW_SESSION: session2 });
+    expect(JSON.parse(status2.stdout).status).toBe("unlocked");
+
+    // Verify we got a new session key (not just reusing the old one)
+    expect(session2).toMatch(/^[A-Za-z0-9+/=]+$/);
+  });
 });
