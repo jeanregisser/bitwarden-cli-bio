@@ -58,10 +58,10 @@ bw list items --search email  # still Touch ID, still done
 bwbio get password github
 
 # For scripts — get a session key
-eval $(bwbio unlock)
+export BW_SESSION=$(bwbio unlock --raw)
 ```
 
-If `BW_SESSION` is already set, `bwbio` stays out of the way and passes everything straight to `bw`.
+If `BW_SESSION` is already set, `bwbio` skips biometrics and passes commands straight to `bw` (except `unlock`, which always attempts biometrics).
 
 ### Commands that skip biometrics
 
@@ -74,11 +74,13 @@ login, logout, lock, config, update, completion, status, serve
 
 Everything else triggers biometric unlock if the vault is locked.
 
+`bwbio` also adds `--bwbio-version` to show the wrapper's own version (`--version` is passed through to `bw`).
+
 ## Environment variables
 
 | Variable | Description |
 |----------|-------------|
-| `BW_SESSION` | Already set? `bwbio` passes through to `bw` directly |
+| `BW_SESSION` | Already set? `bwbio` skips biometrics and passes through to `bw` (except `unlock`) |
 | `BW_QUIET` | Set to `true` to suppress all biometric-related messages |
 | `BW_NOINTERACTION` | Set to `true` to skip biometric unlock (requires user interaction) |
 | `BWBIO_VERBOSE` | Set to `true` for verbose logging |
@@ -88,15 +90,15 @@ Everything else triggers biometric unlock if the vault is locked.
 ## Platforms
 
 - **macOS** — Touch ID (including App Store builds) — tested
-- **Windows** — Windows Hello — should work, not yet tested
+- **Windows** — Windows Hello — tested (community)
 - **Linux** — Polkit — should work, not yet tested
 
-The IPC protocol is the same across platforms. If you try Windows or Linux, please [open an issue](https://github.com/jeanregisser/bitwarden-cli-bio/issues) and let us know how it goes!
+The IPC protocol is the same across platforms. If you try Linux, please [open an issue](https://github.com/jeanregisser/bitwarden-cli-bio/issues) and let us know how it goes!
 
 ## Supply chain trust
 
-Every npm release is automatically built and published from CI via [semantic-release](https://github.com/semantic-release/semantic-release), with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) enabled. This means:
-
+- **Zero runtime dependencies** — only Node.js built-in modules, nothing from npm at runtime
+- Every push to `main` is automatically built and published via [semantic-release](https://github.com/semantic-release/semantic-release), with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) enabled
 - No human runs `npm publish` — releases come directly from GitHub Actions
 - Each package on npm links back to the exact source commit and CI run that produced it
 - You can verify this on the [npm package page](https://www.npmjs.com/package/bitwarden-cli-bio) (look for the "Provenance" badge)
