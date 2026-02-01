@@ -12,6 +12,8 @@ bwbio get password github
 # [Touch ID prompt] → done
 ```
 
+![demo](assets/demo.gif)
+
 ## How?
 
 `bwbio` talks to the Bitwarden Desktop app over IPC — the same protocol the browser extension uses — to unlock your vault with biometrics. Then it hands off to the official `bw` CLI with the session key. You still need `bw` installed; `bwbio` just handles the unlock part.
