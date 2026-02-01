@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import packageJson from "../package.json";
 import { attemptBiometricUnlock } from "./biometrics";
 import { isPassthroughCommand } from "./passthrough";
 import { generateSessionKey, storeUserKeyForSession } from "./session-storage";
@@ -89,6 +90,11 @@ async function handleUnlock(
  * Skips biometrics when BW_SESSION is set, in non-interactive mode, or for passthrough commands.
  */
 export async function main(args: string[]): Promise<number> {
+  if (args.includes("--bwbio-version")) {
+    writeLn(packageJson.version);
+    return 0;
+  }
+
   // Mirror --quiet and --nointeraction flags to env vars (same as bw CLI)
   if (args.includes("--quiet")) {
     process.env.BW_QUIET = "true";
