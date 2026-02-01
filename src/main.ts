@@ -65,8 +65,18 @@ async function handleUnlock(
   if (isRaw) {
     writeLn(sessionKey);
   } else {
-    writeLn(`export BW_SESSION="${sessionKey}"`);
-    writeLn(`# Run this command to set the session: eval $(bwbio unlock)`);
+    const greenBright = "\x1b[92m";
+    const reset = "\x1b[0m";
+    writeLn(`${greenBright}Your vault is now unlocked!${reset}\n`);
+    writeLn(
+      "To unlock your vault, set your session key to the `BW_SESSION` environment variable. ex:",
+    );
+    writeLn(`$ export BW_SESSION="${sessionKey}"`);
+    writeLn(`> $env:BW_SESSION="${sessionKey}"\n`);
+    writeLn(
+      "You can also pass the session key to any command with the `--session` option. ex:",
+    );
+    writeLn(`$ bw list items --session ${sessionKey}`);
   }
 
   return 0;
