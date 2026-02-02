@@ -46,6 +46,8 @@ jobs:
       pull-requests: write # to be able to comment on released pull requests
       id-token: write # to enable use of OIDC for npm trusted publishing and provenance
     environment: npm-publish # extra protection for publishing to npm
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,3 +59,20 @@ jobs:
       - run: npm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get released version
+        id: version
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+  update-homebrew:
+    if: github.ref == 'refs/heads/main' && !contains(needs.publish.outputs.version, 'semantic-release')
+    needs: [publish]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          gh workflow run update-formula.yml \
+            -R jeanregisser/homebrew-tap \
+            -f formula=bitwarden-cli-bio \
+            -f version="${{ needs.publish.outputs.version }}"

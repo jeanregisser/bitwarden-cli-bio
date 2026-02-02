@@ -45,6 +45,10 @@ If biometrics fail for any reason (Desktop app closed, prompt cancelled, etc.), 
 **Install:**
 
 ```bash
+# With Homebrew (macOS/Linux)
+brew install jeanregisser/tap/bitwarden-cli-bio
+
+# Or with npm
 npm install -g bitwarden-cli-bio
 ```
 
