@@ -13,7 +13,6 @@ import { NativeMessagingClient } from "./native-messaging-client";
 // Mock the IPC socket boundary
 vi.mock("./ipc-socket.service", () => {
   const MockIpcSocketService = vi.fn(function (this: any) {
-    this.isSocketAvailable = vi.fn();
     this.connect = vi.fn().mockResolvedValue(undefined);
     this.disconnect = vi.fn();
     this.onMessage = vi.fn();
@@ -25,7 +24,6 @@ vi.mock("./ipc-socket.service", () => {
 
 function getMockSocket(client: NativeMessagingClient) {
   return (client as any).ipcSocket as {
-    isSocketAvailable: Mock;
     connect: Mock;
     disconnect: Mock;
     onMessage: Mock;
@@ -50,14 +48,6 @@ describe("NativeMessagingClient", () => {
   });
 
   describe("connection lifecycle", () => {
-    it("checks socket availability", async () => {
-      mockSocket.isSocketAvailable.mockResolvedValue(true);
-      expect(await client.isDesktopAppAvailable()).toBe(true);
-
-      mockSocket.isSocketAvailable.mockResolvedValue(false);
-      expect(await client.isDesktopAppAvailable()).toBe(false);
-    });
-
     it("connects and sets up handlers", async () => {
       await client.connect();
 

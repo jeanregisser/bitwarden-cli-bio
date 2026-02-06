@@ -62,20 +62,11 @@ export async function attemptBiometricUnlock(
 
   const appId = generateAppId();
   const client = new NativeMessagingClient(appId, userId);
+  let connected = false;
 
   try {
-    // Check if desktop app is available
-    const available = await client.isDesktopAppAvailable();
-    if (!available) {
-      logVerbose(
-        "Biometric unlock unavailable: Bitwarden Desktop app is not running",
-      );
-      return { success: false };
-    }
-
-    logVerbose("Connecting to Bitwarden Desktop...");
-
     await client.connect();
+    connected = true;
 
     // Get user-specific biometrics status
     logVerbose("Checking biometrics status...");
@@ -109,7 +100,11 @@ export async function attemptBiometricUnlock(
     };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    log(`Biometric unlock failed: ${error}`);
+    if (connected) {
+      log(`Biometric unlock failed: ${error}`);
+    } else {
+      logVerbose(`Biometric unlock unavailable: ${error}`);
+    }
     return { success: false };
   } finally {
     client.disconnect();
@@ -129,11 +124,6 @@ export async function checkBiometricsAvailable(): Promise<boolean> {
   const client = new NativeMessagingClient(appId, userId);
 
   try {
-    const available = await client.isDesktopAppAvailable();
-    if (!available) {
-      return false;
-    }
-
     await client.connect();
     const status = await client.getBiometricsStatusForUser(userId);
     return status === BiometricsStatus.Available;

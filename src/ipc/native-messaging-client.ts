@@ -113,13 +113,6 @@ export class NativeMessagingClient {
   }
 
   /**
-   * Check if the desktop app is available (socket exists).
-   */
-  async isDesktopAppAvailable(): Promise<boolean> {
-    return this.ipcSocket.isSocketAvailable();
-  }
-
-  /**
    * Connect to the desktop app.
    */
   async connect(): Promise<void> {
@@ -150,10 +143,8 @@ export class NativeMessagingClient {
       });
 
       this.connected = true;
+    } finally {
       this.connecting = false;
-    } catch (e) {
-      this.connecting = false;
-      throw e;
     }
   }
 

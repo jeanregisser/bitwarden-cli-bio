@@ -1,8 +1,8 @@
 import * as crypto from "node:crypto";
-import * as fs from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
+import { logVerbose } from "../log";
 
 const DEBUG = process.env.BWBIO_DEBUG === "true";
 
@@ -19,26 +19,25 @@ export class IpcSocketService {
   private disconnectHandler: (() => void) | null = null;
 
   /**
-   * Get the IPC socket path for the current platform.
-   * This mirrors the logic in desktop_native/core/src/ipc/mod.rs
+   * Get all socket candidates for the current platform in lookup order.
    */
-  getSocketPath(): string {
+  getSocketCandidates(): string[] {
     if (process.env.BWBIO_IPC_SOCKET_PATH) {
-      return process.env.BWBIO_IPC_SOCKET_PATH;
+      return [process.env.BWBIO_IPC_SOCKET_PATH];
     }
 
     const platform = os.platform();
 
     if (platform === "win32") {
-      return this.getWindowsSocketPath();
+      return [this.getWindowsSocketPath()];
     }
 
     if (platform === "darwin") {
-      return this.getMacSocketPath();
+      return this.getMacSocketPaths();
     }
 
     // Linux: use XDG cache directory or fallback
-    return this.getLinuxSocketPath();
+    return [this.getLinuxSocketPath()];
   }
 
   /**
@@ -59,9 +58,8 @@ export class IpcSocketService {
   /**
    * Get the socket path on macOS.
    * The Desktop app can be sandboxed (Mac App Store) or non-sandboxed.
-   * We check both paths and return the one that exists.
    */
-  private getMacSocketPath(): string {
+  private getMacSocketPaths(): string[] {
     const homeDir = os.homedir();
 
     // Path for sandboxed Desktop app (Mac App Store version)
@@ -82,24 +80,7 @@ export class IpcSocketService {
       "s.bw",
     );
 
-    // Check sandboxed path first (most common for Mac App Store users)
-    try {
-      fs.accessSync(sandboxedPath);
-      return sandboxedPath;
-    } catch {
-      // Socket not found at sandboxed path
-    }
-
-    // Check non-sandboxed path
-    try {
-      fs.accessSync(nonSandboxedPath);
-      return nonSandboxedPath;
-    } catch {
-      // Socket not found at non-sandboxed path either
-    }
-
-    // Default to sandboxed path
-    return sandboxedPath;
+    return [sandboxedPath, nonSandboxedPath];
   }
 
   /**
@@ -114,19 +95,6 @@ export class IpcSocketService {
   }
 
   /**
-   * Check if the desktop app socket exists (quick availability check).
-   */
-  async isSocketAvailable(): Promise<boolean> {
-    const socketPath = this.getSocketPath();
-    try {
-      await fs.promises.access(socketPath);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
    * Connect to the desktop app's IPC socket.
    */
   async connect(): Promise<void> {
@@ -134,8 +102,25 @@ export class IpcSocketService {
       return;
     }
 
-    const socketPath = this.getSocketPath();
+    const socketPaths = this.getSocketCandidates();
+    for (const socketPath of socketPaths) {
+      logVerbose(`Connecting to desktop app (via ${socketPath})`);
+      try {
+        await this.connectToSocketPath(socketPath);
+        return;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logVerbose(`Failed to connect: ${message}`);
+      }
+    }
 
+    throw new Error("Failed to connect to desktop app (is the app running?)");
+  }
+
+  /**
+   * Connect to a specific desktop app IPC socket path.
+   */
+  private async connectToSocketPath(socketPath: string): Promise<void> {
     if (DEBUG) {
       console.error(`[DEBUG] Connecting to socket: ${socketPath}`);
     }
@@ -160,7 +145,7 @@ export class IpcSocketService {
 
       socket.on("error", (err) => {
         if (this.socket == null) {
-          reject(new Error(`Failed to connect to desktop app: ${err.message}`));
+          reject(err);
         }
       });
 
@@ -191,13 +176,6 @@ export class IpcSocketService {
       this.socket = null;
     }
     this.messageBuffer = Buffer.alloc(0);
-  }
-
-  /**
-   * Check if currently connected.
-   */
-  isConnected(): boolean {
-    return this.socket != null && !this.socket.destroyed;
   }
 
   /**
