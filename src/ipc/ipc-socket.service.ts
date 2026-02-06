@@ -2,9 +2,7 @@ import * as crypto from "node:crypto";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
-import { logVerbose } from "../log";
-
-const DEBUG = process.env.BWBIO_DEBUG === "true";
+import { logDebug, logVerbose } from "../log";
 
 /**
  * Platform-specific IPC socket service for connecting to the Bitwarden desktop app.
@@ -99,6 +97,7 @@ export class IpcSocketService {
    */
   async connect(): Promise<void> {
     if (this.socket != null) {
+      logDebug("connect() called while already connected");
       return;
     }
 
@@ -121,35 +120,33 @@ export class IpcSocketService {
    * Connect to a specific desktop app IPC socket path.
    */
   private async connectToSocketPath(socketPath: string): Promise<void> {
-    if (DEBUG) {
-      console.error(`[DEBUG] Connecting to socket: ${socketPath}`);
-    }
+    logDebug(`Connecting to socket: ${socketPath}`);
 
     return new Promise((resolve, reject) => {
       const socket = net.createConnection(socketPath);
 
       socket.on("connect", () => {
-        if (DEBUG) {
-          console.error(`[DEBUG] Socket connected`);
-        }
+        logDebug(`Socket connected: ${socketPath}`);
         this.socket = socket;
         resolve();
       });
 
       socket.on("data", (data: Buffer) => {
-        if (DEBUG) {
-          console.error(`[DEBUG] Received raw data: ${data.length} bytes`);
-        }
+        logDebug(`Received raw data: ${data.length} bytes`);
         this.processIncomingData(data);
       });
 
       socket.on("error", (err) => {
+        logDebug(
+          `Socket error on ${socketPath}: ${err.message} (connected=${this.socket != null})`,
+        );
         if (this.socket == null) {
           reject(err);
         }
       });
 
-      socket.on("close", () => {
+      socket.on("close", (hadError) => {
+        logDebug(`Socket closed: ${socketPath} (hadError=${hadError})`);
         this.socket = null;
         this.messageBuffer = Buffer.alloc(0);
         if (this.disconnectHandler) {
@@ -160,8 +157,11 @@ export class IpcSocketService {
       // Timeout for initial connection
       socket.setTimeout(5000, () => {
         if (this.socket == null) {
+          logDebug(`Connection timeout for socket: ${socketPath}`);
           socket.destroy();
           reject(new Error("Connection to desktop app timed out"));
+        } else {
+          logDebug(`Socket timeout ignored (already connected): ${socketPath}`);
         }
       });
     });
@@ -172,6 +172,7 @@ export class IpcSocketService {
    */
   disconnect(): void {
     if (this.socket != null) {
+      logDebug("Disconnecting socket");
       this.socket.destroy();
       this.socket = null;
     }
@@ -209,11 +210,9 @@ export class IpcSocketService {
     buffer.writeUInt32LE(messageBytes.length, 0);
     messageBytes.copy(buffer, 4);
 
-    if (DEBUG) {
-      console.error(
-        `[DEBUG] Sending ${buffer.length} bytes (message: ${messageBytes.length} bytes)`,
-      );
-    }
+    logDebug(
+      `Sending ${buffer.length} bytes (message: ${messageBytes.length} bytes)`,
+    );
 
     this.socket.write(buffer);
   }
@@ -231,6 +230,9 @@ export class IpcSocketService {
 
       // Check if we have the full message
       if (this.messageBuffer.length < 4 + messageLength) {
+        logDebug(
+          `Waiting for more data: need ${4 + messageLength}, have ${this.messageBuffer.length}`,
+        );
         break;
       }
 
@@ -245,9 +247,11 @@ export class IpcSocketService {
         const message = JSON.parse(messageStr);
         if (this.messageHandler) {
           this.messageHandler(message);
+        } else {
+          logDebug("Dropped message because no message handler is set");
         }
       } catch {
-        // Failed to parse message
+        logDebug("Failed to parse incoming IPC message as JSON");
       }
     }
   }

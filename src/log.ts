@@ -15,3 +15,14 @@ export function logVerbose(message: string): void {
     console.error(message);
   }
 }
+
+/**
+ * Log a debug message to stderr when BWBIO_DEBUG is set.
+ *
+ * Debug logs intentionally ignore BW_QUIET because debug mode is explicit.
+ */
+export function logDebug(message: string): void {
+  if (process.env.BWBIO_DEBUG === "true") {
+    console.error(`[DEBUG] ${message}`);
+  }
+}
