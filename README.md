@@ -93,6 +93,20 @@ Everything else triggers biometric unlock if the vault is locked.
 | `BWBIO_DEBUG` | Set to `true` for raw IPC message dumps |
 | `BWBIO_IPC_SOCKET_PATH` | Override the IPC socket path (advanced) |
 
+## Troubleshooting
+
+### `Failed to connect to desktop app` / socket `ENOENT`
+
+If verbose logs show connection attempts to `.../s.bw` failing with `ENOENT`, `bwbio` cannot find the Desktop IPC socket.
+
+1. Open the Bitwarden Desktop app (unlock temporarily only if needed to access settings).
+2. In Desktop settings, enable `Allow browser integration`.
+3. Retry with verbose logs:
+
+```bash
+BWBIO_VERBOSE=true bwbio unlock
+```
+
 ## Platforms
 
 - **macOS** — Touch ID (including App Store builds) — tested
