@@ -113,7 +113,9 @@ export class IpcSocketService {
       }
     }
 
-    throw new Error("Failed to connect to desktop app (is the app running?)");
+    throw new Error(
+      'Failed to connect to desktop app. Ensure the app is running and "Allow browser integration" is enabled in Desktop settings.',
+    );
   }
 
   /**
