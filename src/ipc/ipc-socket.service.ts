@@ -21,6 +21,9 @@ export class IpcSocketService {
    */
   getSocketCandidates(): string[] {
     if (process.env.BWBIO_IPC_SOCKET_PATH) {
+      logVerbose(
+        `Using custom IPC socket path from BWBIO_IPC_SOCKET_PATH: ${process.env.BWBIO_IPC_SOCKET_PATH}`,
+      );
       return [process.env.BWBIO_IPC_SOCKET_PATH];
     }
 
@@ -229,6 +232,14 @@ export class IpcSocketService {
     // Process all complete messages in the buffer
     while (this.messageBuffer.length >= 4) {
       const messageLength = this.messageBuffer.readUInt32LE(0);
+
+      // Reject absurdly large messages to prevent memory exhaustion
+      const MAX_MESSAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+      if (messageLength > MAX_MESSAGE_SIZE) {
+        logDebug(`Message too large (${messageLength} bytes), disconnecting`);
+        this.disconnect();
+        return;
+      }
 
       // Check if we have the full message
       if (this.messageBuffer.length < 4 + messageLength) {
