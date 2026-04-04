@@ -36,15 +36,18 @@ async function executeBw(args: string[], sessionKey?: string): Promise<number> {
     }
 
     // On Windows, spawn needs shell to resolve .cmd wrappers (e.g. bw.cmd).
-    // Use string form (no args array) to avoid DEP0190: passing args with
-    // shell:true is deprecated because they are concatenated, not escaped.
+    // Using process.env.ComSpec (cmd.exe) with /c avoids shell:true which
+    // would concatenate args unsafely and risk command injection.
     const child =
       process.platform === "win32"
-        ? spawn([getBwPath(), ...args].join(" "), {
-            stdio: "inherit",
-            env,
-            shell: true,
-          })
+        ? spawn(
+            process.env.ComSpec ?? "cmd.exe",
+            ["/c", getBwPath(), ...args],
+            {
+              stdio: "inherit",
+              env,
+            },
+          )
         : spawn(getBwPath(), args, { stdio: "inherit", env });
 
     child.on("error", (err) => {
