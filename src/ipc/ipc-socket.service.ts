@@ -134,25 +134,29 @@ export class IpcSocketService {
       });
 
       socket.on("data", (data: Buffer) => {
-        logDebug(`Received raw data: ${data.length} bytes`);
-        this.processIncomingData(data);
+        if (this.socket === socket) {
+          logDebug(`Received raw data: ${data.length} bytes`);
+          this.processIncomingData(data);
+        }
       });
 
       socket.on("error", (err) => {
         logDebug(
           `Socket error on ${socketPath}: ${err.message} (connected=${this.socket != null})`,
         );
-        if (this.socket == null) {
+        if (this.socket === socket || this.socket == null) {
           reject(err);
         }
       });
 
       socket.on("close", (hadError) => {
         logDebug(`Socket closed: ${socketPath} (hadError=${hadError})`);
-        this.socket = null;
-        this.messageBuffer = Buffer.alloc(0);
-        if (this.disconnectHandler) {
-          this.disconnectHandler();
+        if (this.socket === socket) {
+          this.socket = null;
+          this.messageBuffer = Buffer.alloc(0);
+          if (this.disconnectHandler) {
+            this.disconnectHandler();
+          }
         }
       });
 
