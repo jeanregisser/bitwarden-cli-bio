@@ -133,22 +133,30 @@ export class IpcSocketService {
         resolve();
       });
 
+      // Events can fire late, after a failed candidate was replaced by the
+      // next one or after disconnect(); only the active socket counts
       socket.on("data", (data: Buffer) => {
+        if (this.socket !== socket) {
+          return;
+        }
         logDebug(`Received raw data: ${data.length} bytes`);
         this.processIncomingData(data);
       });
 
       socket.on("error", (err) => {
         logDebug(
-          `Socket error on ${socketPath}: ${err.message} (connected=${this.socket != null})`,
+          `Socket error on ${socketPath}: ${err.message} (connected=${this.socket === socket})`,
         );
-        if (this.socket == null) {
-          reject(err);
-        }
+        // Only fails the connection attempt; a no-op once it has settled.
+        // Errors on an established socket surface through "close".
+        reject(err);
       });
 
       socket.on("close", (hadError) => {
         logDebug(`Socket closed: ${socketPath} (hadError=${hadError})`);
+        if (this.socket !== socket) {
+          return;
+        }
         this.socket = null;
         this.messageBuffer = Buffer.alloc(0);
         if (this.disconnectHandler) {
@@ -158,7 +166,7 @@ export class IpcSocketService {
 
       // Timeout for initial connection
       socket.setTimeout(5000, () => {
-        if (this.socket == null) {
+        if (this.socket !== socket) {
           logDebug(`Connection timeout for socket: ${socketPath}`);
           socket.destroy();
           reject(new Error("Connection to desktop app timed out"));
