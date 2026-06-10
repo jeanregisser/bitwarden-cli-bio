@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import packageJson from "../package.json";
 import { attemptBiometricUnlock } from "./biometrics";
 import { isPassthroughCommand } from "./passthrough";
+import { reportUnlockRequest } from "./provenance";
 import { generateSessionKey, storeUserKeyForSession } from "./session-storage";
 
 function writeLn(s: string): void {
@@ -119,6 +120,10 @@ export async function main(args: string[]): Promise<number> {
   ) {
     return executeBw(args);
   }
+
+  // Surface which process is requesting the unlock (opt-in via
+  // BWBIO_AUDIT_LOG / BWBIO_NOTIFY) before any biometric prompt appears
+  reportUnlockRequest(args);
 
   // Attempt biometric unlock
   const result = await attemptBiometricUnlock();

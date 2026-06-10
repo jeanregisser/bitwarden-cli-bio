@@ -92,6 +92,25 @@ Everything else triggers biometric unlock if the vault is locked.
 | `BWBIO_VERBOSE` | Set to `true` for verbose logging |
 | `BWBIO_DEBUG` | Set to `true` for raw IPC message dumps |
 | `BWBIO_IPC_SOCKET_PATH` | Override the IPC socket path (advanced) |
+| `BWBIO_AUDIT_LOG` | Path to an audit log; every biometric unlock attempt appends a timestamped entry with the requesting process chain, parent command, and cwd |
+| `BWBIO_NOTIFY` | Set to `true` to show an OS notification naming the requesting process alongside the biometric prompt (macOS only for now) |
+
+## Knowing who's asking
+
+Biometrics prove *you're present* — not *which process asked*. Any process running as your user can trigger a legitimate-looking unlock prompt. Two opt-in features close that gap:
+
+```bash
+export BWBIO_AUDIT_LOG="$HOME/.local/state/bwbio/audit.log"   # forensic trail
+export BWBIO_NOTIFY=true                                       # banner names the requester
+```
+
+With `BWBIO_NOTIFY=true`, a notification like `bash ./deploy.sh | /Users/you/project` appears next to the Touch ID dialog — if the named process isn't something you just ran (or no notification appears at all), deny the prompt. The audit log records the same provenance for review after the fact:
+
+```
+[2026-06-10T12:00:00.000Z] bwbio unlock --raw | cwd=/Users/you/project
+  requester: zsh(1234) <- claude(567) <- zsh(89)
+  parent-cmd: bash ./deploy.sh
+```
 
 ## Troubleshooting
 
