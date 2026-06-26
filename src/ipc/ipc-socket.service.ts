@@ -4,6 +4,27 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { logDebug, logVerbose } from "../log";
 
+const BITWARDEN_DESKTOP_APP_ID = "com.bitwarden.desktop";
+
+export function getLinuxSocketPaths(
+  homeDir: string,
+  xdgCacheHome?: string,
+): string[] {
+  const cacheDir = xdgCacheHome ?? path.join(homeDir, ".cache");
+  const defaultPath = path.join(cacheDir, BITWARDEN_DESKTOP_APP_ID, "s.bw");
+  const flatpakPath = path.join(
+    homeDir,
+    ".var",
+    "app",
+    BITWARDEN_DESKTOP_APP_ID,
+    "cache",
+    BITWARDEN_DESKTOP_APP_ID,
+    "s.bw",
+  );
+
+  return [defaultPath, flatpakPath];
+}
+
 /**
  * Platform-specific IPC socket service for connecting to the Bitwarden desktop app.
  *
@@ -34,8 +55,7 @@ export class IpcSocketService {
       return this.getMacSocketPaths();
     }
 
-    // Linux: use XDG cache directory or fallback
-    return [this.getLinuxSocketPath()];
+    return getLinuxSocketPaths(os.homedir(), process.env.XDG_CACHE_HOME);
   }
 
   /**
@@ -74,22 +94,11 @@ export class IpcSocketService {
       homeDir,
       "Library",
       "Caches",
-      "com.bitwarden.desktop",
+      BITWARDEN_DESKTOP_APP_ID,
       "s.bw",
     );
 
     return [sandboxedPath, nonSandboxedPath];
-  }
-
-  /**
-   * Linux socket path - uses XDG_CACHE_HOME or ~/.cache.
-   */
-  private getLinuxSocketPath(): string {
-    const cacheDir =
-      process.env.XDG_CACHE_HOME != null
-        ? process.env.XDG_CACHE_HOME
-        : path.join(os.homedir(), ".cache");
-    return path.join(cacheDir, "com.bitwarden.desktop", "s.bw");
   }
 
   /**
@@ -142,17 +151,19 @@ export class IpcSocketService {
         logDebug(
           `Socket error on ${socketPath}: ${err.message} (connected=${this.socket != null})`,
         );
-        if (this.socket == null) {
+        if (this.socket == null || this.socket === socket) {
           reject(err);
         }
       });
 
       socket.on("close", (hadError) => {
         logDebug(`Socket closed: ${socketPath} (hadError=${hadError})`);
-        this.socket = null;
-        this.messageBuffer = Buffer.alloc(0);
-        if (this.disconnectHandler) {
-          this.disconnectHandler();
+        if (this.socket === socket) {
+          this.socket = null;
+          this.messageBuffer = Buffer.alloc(0);
+          if (this.disconnectHandler) {
+            this.disconnectHandler();
+          }
         }
       });
 
