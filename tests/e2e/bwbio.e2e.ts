@@ -135,6 +135,7 @@ describe("bwbio E2E", () => {
     const result = await bwbio(["unlock", "--raw"]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toMatch(/^[A-Za-z0-9+/=]+$/);
+    expect(mockServer.announcedClientTypes).toContain("cli");
 
     // Verify the session key actually works
     const statusResult = await bw(["status"], { BW_SESSION: result.stdout });

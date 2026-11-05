@@ -130,6 +130,8 @@ export class IpcSocketService {
       socket.on("connect", () => {
         logDebug(`Socket connected: ${socketPath}`);
         this.socket = socket;
+        // Desktop 2026.10+ drops clients whose first frame is not an announcement
+        this.sendMessage({ clientType: "cli" });
         resolve();
       });
 

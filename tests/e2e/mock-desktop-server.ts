@@ -9,6 +9,7 @@ import * as path from "node:path";
  *
  * Implements the real Bitwarden Desktop app IPC protocol:
  * - Length-delimited JSON messages over Unix socket
+ * - Client announcement as the first frame (Desktop 2026.10+), e.g. {"clientType":"cli"}
  * - RSA-OAEP (SHA-1) key exchange via setupEncryption
  * - AES-256-CBC + HMAC-SHA256 encrypted communication (64-byte shared secret)
  * - Handles getBiometricsStatusForUser and unlockWithBiometricsForUser
@@ -24,6 +25,7 @@ export class MockDesktopServer {
 
   // Message tracking
   private _receivedMessages: Array<{ command: string; payload?: unknown }> = [];
+  private _announcedClientTypes: string[] = [];
 
   // Encryption state per connection
   private connectionStates = new Map<net.Socket, { sharedSecret: Buffer }>();
@@ -99,6 +101,10 @@ export class MockDesktopServer {
     this._receivedMessages = [];
   }
 
+  get announcedClientTypes(): string[] {
+    return [...this._announcedClientTypes];
+  }
+
   getSocketPath(): string {
     return this.socketPath;
   }
@@ -106,6 +112,7 @@ export class MockDesktopServer {
   private handleConnection(socket: net.Socket): void {
     this.connections.push(socket);
     let buffer = Buffer.alloc(0);
+    let announced = false;
 
     socket.on("data", (chunk: Buffer) => {
       buffer = Buffer.concat([buffer, chunk]);
@@ -121,6 +128,17 @@ export class MockDesktopServer {
 
         try {
           const outer = JSON.parse(messageJson);
+          // Like Desktop 2026.10+, the first frame must be a client announcement
+          if (!announced) {
+            if (typeof outer.clientType !== "string") {
+              console.error("Mock server: client did not announce itself");
+              socket.destroy();
+              return;
+            }
+            this._announcedClientTypes.push(outer.clientType);
+            announced = true;
+            continue;
+          }
           this.handleOuterMessage(socket, outer);
         } catch (err) {
           console.error("Mock server: failed to parse message", err);
