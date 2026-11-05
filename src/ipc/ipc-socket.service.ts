@@ -130,6 +130,7 @@ export class IpcSocketService {
       socket.on("connect", () => {
         logDebug(`Socket connected: ${socketPath}`);
         this.socket = socket;
+        this.sendMessage({ clientType: "cli" });
         resolve();
       });
 
