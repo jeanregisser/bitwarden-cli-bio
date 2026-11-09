@@ -13,9 +13,60 @@ import {
 } from "vitest";
 import { IpcSocketService } from "./ipc-socket.service";
 
+// Real os by default; tests override it to check other platforms' paths
+vi.mock("node:os", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:os")>();
+  return {
+    ...actual,
+    platform: vi.fn(actual.platform),
+    homedir: vi.fn(actual.homedir),
+  };
+});
+
+describe("IpcSocketService.getSocketCandidates", () => {
+  const home = path.join("/home", "alice");
+
+  beforeEach(() => {
+    vi.mocked(os.platform).mockReturnValue("linux");
+    vi.mocked(os.homedir).mockReturnValue(home);
+    vi.stubEnv("BWBIO_IPC_SOCKET_PATH", "");
+  });
+
+  afterEach(() => {
+    vi.mocked(os.platform).mockRestore();
+    vi.mocked(os.homedir).mockRestore();
+    vi.unstubAllEnvs();
+  });
+
+  it("tries the native then the Flatpak socket on Linux", () => {
+    vi.stubEnv("XDG_CACHE_HOME", path.join(home, ".my-cache"));
+
+    expect(new IpcSocketService().getSocketCandidates()).toEqual([
+      path.join(home, ".my-cache", "com.bitwarden.desktop", "s.bw"),
+      path.join(
+        home,
+        ".var",
+        "app",
+        "com.bitwarden.desktop",
+        "cache",
+        "com.bitwarden.desktop",
+        "s.bw",
+      ),
+    ]);
+  });
+
+  it("defaults the native socket to ~/.cache on Linux", () => {
+    vi.stubEnv("XDG_CACHE_HOME", undefined);
+
+    expect(new IpcSocketService().getSocketCandidates()[0]).toBe(
+      path.join(home, ".cache", "com.bitwarden.desktop", "s.bw"),
+    );
+  });
+});
+
 // Uses real Unix domain sockets: the race covered here depends on Node's
 // event ordering, which a mocked socket would not reproduce.
-describe.skipIf(os.platform() === "win32")("IpcSocketService", () => {
+describe.skipIf(os.platform() === "win32")("IpcSocketService.connect", () => {
   let tmpDir: string;
   let server: net.Server;
   let serverSockets: net.Socket[];

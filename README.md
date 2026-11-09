@@ -111,7 +111,7 @@ BWBIO_VERBOSE=true bwbio unlock
 
 - **macOS** — Touch ID (including App Store builds) — tested
 - **Windows** — Windows Hello — tested (community)
-- **Linux** — Polkit — should work, not yet tested
+- **Linux** — Polkit (including Flatpak builds) — tested with Flatpak (community)
 
 The IPC protocol is the same across platforms. If you try Linux, please [open an issue](https://github.com/jeanregisser/bitwarden-cli-bio/issues) and let us know how it goes!
 

@@ -34,8 +34,7 @@ export class IpcSocketService {
       return this.getMacSocketPaths();
     }
 
-    // Linux: use XDG cache directory or fallback
-    return [this.getLinuxSocketPath()];
+    return this.getLinuxSocketPaths();
   }
 
   /**
@@ -82,14 +81,32 @@ export class IpcSocketService {
   }
 
   /**
-   * Linux socket path - uses XDG_CACHE_HOME or ~/.cache.
+   * Get the socket paths on Linux.
+   * The Desktop app can be installed natively or as a Flatpak.
    */
-  private getLinuxSocketPath(): string {
+  private getLinuxSocketPaths(): string[] {
+    const homeDir = os.homedir();
+
+    // Path for native Desktop app - uses XDG_CACHE_HOME or ~/.cache
     const cacheDir =
       process.env.XDG_CACHE_HOME != null
         ? process.env.XDG_CACHE_HOME
-        : path.join(os.homedir(), ".cache");
-    return path.join(cacheDir, "com.bitwarden.desktop", "s.bw");
+        : path.join(homeDir, ".cache");
+    const nativePath = path.join(cacheDir, "com.bitwarden.desktop", "s.bw");
+
+    // Path for Flatpak Desktop app - Flatpak sets the app's XDG_CACHE_HOME
+    // to its own cache dir, which bwbio outside the sandbox doesn't see
+    const flatpakPath = path.join(
+      homeDir,
+      ".var",
+      "app",
+      "com.bitwarden.desktop",
+      "cache",
+      "com.bitwarden.desktop",
+      "s.bw",
+    );
+
+    return [nativePath, flatpakPath];
   }
 
   /**
