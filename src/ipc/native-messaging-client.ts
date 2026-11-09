@@ -313,9 +313,10 @@ export class NativeMessagingClient {
    */
   private async handleMessage(message: ReceivedMessageOuter): Promise<void> {
     if (DEBUG) {
+      const { sharedSecret: _, ...safeMessage } = message;
       console.error(
         `[DEBUG] Received message:`,
-        JSON.stringify(message, null, 2),
+        JSON.stringify(safeMessage, null, 2),
       );
     }
 
@@ -408,7 +409,10 @@ export class NativeMessagingClient {
       return;
     }
 
-    // Decrypt the shared secret using our private key (RSA-OAEP with SHA-1)
+    // Decrypt the shared secret using our private key.
+    // RSA-OAEP with SHA-1 is required for compatibility with the Bitwarden
+    // Desktop app. SHA-1's collision weaknesses do not affect OAEP security
+    // (OAEP uses the hash for mask generation, not collision resistance).
     const encrypted = Buffer.from(message.sharedSecret, "base64");
     if (DEBUG) {
       console.error(
@@ -490,9 +494,10 @@ export class NativeMessagingClient {
    */
   private processDecryptedMessage(message: ReceivedMessage): void {
     if (DEBUG) {
+      const { userKeyB64: _, ...safeMessage } = message;
       console.error(
         `[DEBUG] Decrypted message:`,
-        JSON.stringify(message, null, 2),
+        JSON.stringify(safeMessage, null, 2),
       );
     }
 

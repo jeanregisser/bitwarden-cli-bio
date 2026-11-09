@@ -42,6 +42,11 @@ export function generateSessionKey(): string {
 /**
  * Encrypt data using AES-256-CBC with HMAC-SHA256 (Bitwarden's type 2 format).
  *
+ * AES-CBC (rather than AES-GCM) is required for compatibility with the official
+ * Bitwarden CLI, which expects EncryptionType 2 (AesCbc256_HmacSha256_B64).
+ * The encrypt-then-MAC construction (HMAC over IV+ciphertext) provides
+ * authentication. The bw CLI verifies the MAC with timing-safe comparison.
+ *
  * @param data - The data to encrypt (as Uint8Array)
  * @param sessionKey - The session key (base64 encoded, 64 bytes when decoded)
  * @returns Encrypted data as base64 string
