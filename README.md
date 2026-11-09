@@ -127,6 +127,8 @@ The IPC protocol is the same across platforms. If you try Linux, please [open an
 
 This should really be a feature of the official CLI. A [PR was proposed](https://github.com/bitwarden/clients/pull/18273) but was closed — the Bitwarden team wants to wait until they have a proper IPC framework. This wrapper fills the gap in the meantime using the same IPC code from that PR.
 
+**Update (November 2026):** that framework has landed, and [official support](https://github.com/bitwarden/clients/pull/22448) was merged in `bw` 2026.10.0 (thanks [@nurfed1](https://github.com/nurfed1)!). It's still disabled server-side behind a feature flag, so `bwbio` remains the way to get biometric unlock until Bitwarden turns it on.
+
 ## License
 
 [MIT](LICENSE)
