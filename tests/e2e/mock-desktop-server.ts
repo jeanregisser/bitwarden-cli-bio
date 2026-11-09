@@ -9,7 +9,7 @@ import * as path from "node:path";
  *
  * Implements the real Bitwarden Desktop app IPC protocol:
  * - Length-delimited JSON messages over Unix socket
- * - Client announcement as the first frame (Desktop 2026.10+), e.g. {"clientType":"cli"}
+ * - Client announcement as the first frame (Desktop 2026.10.2+), e.g. {"clientType":"cli"}
  * - RSA-OAEP (SHA-1) key exchange via setupEncryption
  * - AES-256-CBC + HMAC-SHA256 encrypted communication (64-byte shared secret)
  * - Handles getBiometricsStatusForUser and unlockWithBiometricsForUser
@@ -128,7 +128,7 @@ export class MockDesktopServer {
 
         try {
           const outer = JSON.parse(messageJson);
-          // Like Desktop 2026.10+, the first frame must be a client announcement
+          // Like Desktop 2026.10.2+, the first frame must be a client announcement
           if (!announced) {
             if (typeof outer.clientType !== "string") {
               console.error("Mock server: client did not announce itself");
