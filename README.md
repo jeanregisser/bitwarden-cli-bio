@@ -107,6 +107,14 @@ If verbose logs show connection attempts to `.../s.bw` failing with `ENOENT`, `b
 BWBIO_VERBOSE=true bwbio unlock
 ```
 
+### `Not found.` / empty search results after unlocking
+
+The vault unlocked, but the CLI's local copy is out of date — common right after `bw login`, or after adding items in another app. Sync it:
+
+```bash
+bwbio sync
+```
+
 ## Platforms
 
 - **macOS** — Touch ID (including App Store builds) — tested
